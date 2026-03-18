@@ -109,18 +109,18 @@ func (c *Client) MinimizeCopilotComments(prNumber int) (int, error) {
 		return 0, fmt.Errorf("failed to query review comments: %w", err)
 	}
 
-	var commentIDs []string
+	var subjectIDs []string
 	for _, review := range query.Repository.PullRequest.Reviews.Nodes {
 		if !isCopilotUser(review.Author.Login) {
 			continue
 		}
 		if !review.IsMinimized {
-			commentIDs = append(commentIDs, review.ID)
+			subjectIDs = append(subjectIDs, review.ID)
 		}
 	}
 
 	minimized := 0
-	for _, id := range commentIDs {
+	for _, id := range subjectIDs {
 		var mutation struct {
 			MinimizeComment struct {
 				MinimizedComment struct {
