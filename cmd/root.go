@@ -44,6 +44,14 @@ func run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	minimized, err := client.MinimizeCopilotComments(prNumber)
+	if err != nil {
+		return err
+	}
+	if minimized > 0 {
+		fmt.Printf("Minimized %d outdated Copilot review comment(s)\n", minimized)
+	}
+
 	requested, err := client.IsCopilotReviewRequested(prNumber)
 	if err != nil {
 		return err
@@ -60,14 +68,6 @@ func run(cmd *cobra.Command, args []string) error {
 	if pending {
 		fmt.Println("Copilot review is in progress")
 		return nil
-	}
-
-	minimized, err := client.MinimizeCopilotComments(prNumber)
-	if err != nil {
-		return err
-	}
-	if minimized > 0 {
-		fmt.Printf("Minimized %d outdated Copilot review comment(s)\n", minimized)
 	}
 
 	if err := client.RequestCopilotReview(prNumber); err != nil {
