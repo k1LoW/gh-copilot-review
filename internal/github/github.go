@@ -2,12 +2,18 @@ package github
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/cli/go-gh/v2"
 	graphql "github.com/cli/shurcooL-graphql"
 
 	"github.com/cli/go-gh/v2/pkg/api"
 )
+
+func isCopilotUser(login string) bool {
+	return strings.EqualFold(login, "copilot-pull-request-reviewer") ||
+		strings.EqualFold(login, "copilot")
+}
 
 type Client struct {
 	rest  *api.RESTClient
@@ -39,7 +45,7 @@ func (c *Client) IsCopilotReviewRequested(prNumber int) (bool, error) {
 		return false, fmt.Errorf("failed to get requested reviewers: %w", err)
 	}
 	for _, u := range result.Users {
-		if u.Login == "copilot" {
+		if isCopilotUser(u.Login) {
 			return true, nil
 		}
 	}
@@ -58,7 +64,7 @@ func (c *Client) HasCopilotPendingReview(prNumber int) (bool, error) {
 		return false, fmt.Errorf("failed to get reviews: %w", err)
 	}
 	for _, r := range reviews {
-		if r.User.Login == "copilot" && r.State == "PENDING" {
+		if isCopilotUser(r.User.Login) && r.State == "PENDING" {
 			return true, nil
 		}
 	}
@@ -109,7 +115,7 @@ func (c *Client) MinimizeCopilotComments(prNumber int) (int, error) {
 
 	var commentIDs []string
 	for _, review := range query.Repository.PullRequest.Reviews.Nodes {
-		if review.Author.Login != "copilot" {
+		if !isCopilotUser(review.Author.Login) {
 			continue
 		}
 		for _, comment := range review.Comments.Nodes {
