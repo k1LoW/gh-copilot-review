@@ -87,15 +87,11 @@ func (c *Client) MinimizeCopilotComments(prNumber int) (int, error) {
 			PullRequest struct {
 				Reviews struct {
 					Nodes []struct {
-						Author struct {
+						ID          string `graphql:"id"`
+						IsMinimized bool   `graphql:"isMinimized"`
+						Author      struct {
 							Login string
 						}
-						Comments struct {
-							Nodes []struct {
-								ID          string `graphql:"id"`
-								IsMinimized bool   `graphql:"isMinimized"`
-							}
-						} `graphql:"comments(first: 100)"`
 					}
 				} `graphql:"reviews(first: 100)"`
 			} `graphql:"pullRequest(number: $number)"`
@@ -118,10 +114,8 @@ func (c *Client) MinimizeCopilotComments(prNumber int) (int, error) {
 		if !isCopilotUser(review.Author.Login) {
 			continue
 		}
-		for _, comment := range review.Comments.Nodes {
-			if !comment.IsMinimized {
-				commentIDs = append(commentIDs, comment.ID)
-			}
+		if !review.IsMinimized {
+			commentIDs = append(commentIDs, review.ID)
 		}
 	}
 
