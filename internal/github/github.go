@@ -1,10 +1,9 @@
 package github
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 
+	"github.com/cli/go-gh/v2"
 	graphql "github.com/cli/shurcooL-graphql"
 
 	"github.com/cli/go-gh/v2/pkg/api"
@@ -67,11 +66,9 @@ func (c *Client) HasCopilotPendingReview(prNumber int) (bool, error) {
 }
 
 func (c *Client) RequestCopilotReview(prNumber int) error {
-	body, err := json.Marshal(map[string][]string{"reviewers": {"copilot"}})
-	if err != nil {
-		return err
-	}
-	err = c.rest.Post(fmt.Sprintf("repos/%s/%s/pulls/%d/requested_reviewers", c.owner, c.repo, prNumber), bytes.NewReader(body), nil)
+	_, _, err := gh.Exec("pr", "edit", fmt.Sprintf("%d", prNumber),
+		"--add-reviewer", "@copilot",
+		"--repo", fmt.Sprintf("%s/%s", c.owner, c.repo))
 	if err != nil {
 		return fmt.Errorf("failed to request Copilot review: %w", err)
 	}

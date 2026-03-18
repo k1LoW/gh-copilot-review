@@ -34,17 +34,12 @@ func Execute() {
 }
 
 func run(cmd *cobra.Command, args []string) error {
-	repo, err := repository.Current()
-	if err != nil {
-		return fmt.Errorf("failed to determine repository: %w", err)
-	}
-
-	client, err := ghclient.NewClient(repo.Owner, repo.Name)
+	owner, repoName, prNumber, err := resolveTarget(args)
 	if err != nil {
 		return err
 	}
 
-	prNumber, err := resolvePRNumber(client, args)
+	client, err := ghclient.NewClient(owner, repoName)
 	if err != nil {
 		return err
 	}
@@ -83,44 +78,57 @@ func run(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func resolvePRNumber(client *ghclient.Client, args []string) (int, error) {
+// resolveTarget returns owner, repo, and PR number from args.
+func resolveTarget(args []string) (string, string, int, error) {
 	if len(args) == 0 {
 		return detectCurrentPR()
 	}
 
 	arg := args[0]
 
+	// Try as a number — requires current repo context
 	if n, err := strconv.Atoi(arg); err == nil {
-		return n, nil
+		repo, err := repository.Current()
+		if err != nil {
+			return "", "", 0, fmt.Errorf("failed to determine repository: %w", err)
+		}
+		return repo.Owner, repo.Name, n, nil
 	}
 
-	if u, err := url.Parse(arg); err == nil {
+	// Try as a URL containing /{owner}/{repo}/pull/{number}
+	if u, err := url.Parse(arg); err == nil && u.Host != "" {
 		parts := strings.Split(path.Clean(u.Path), "/")
+		// parts: ["", owner, repo, "pull", number, ...]
 		for i, p := range parts {
-			if p == "pull" && i+1 < len(parts) {
+			if p == "pull" && i+1 < len(parts) && i >= 3 {
 				if n, err := strconv.Atoi(parts[i+1]); err == nil {
-					return n, nil
+					return parts[i-2], parts[i-1], n, nil
 				}
 			}
 		}
 	}
 
-	return 0, fmt.Errorf("invalid PR number or URL: %s", arg)
+	return "", "", 0, fmt.Errorf("invalid PR number or URL: %s", arg)
 }
 
-func detectCurrentPR() (int, error) {
+func detectCurrentPR() (string, string, int, error) {
 	stdout, _, err := gh.Exec("pr", "view", "--json", "number")
 	if err != nil {
-		return 0, fmt.Errorf("no PR found for current branch: %w", err)
+		return "", "", 0, fmt.Errorf("no PR found for current branch: %w", err)
 	}
 	var result struct {
 		Number int `json:"number"`
 	}
 	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
-		return 0, fmt.Errorf("failed to parse PR info: %w", err)
+		return "", "", 0, fmt.Errorf("failed to parse PR info: %w", err)
 	}
 	if result.Number == 0 {
-		return 0, fmt.Errorf("no PR found for current branch")
+		return "", "", 0, fmt.Errorf("no PR found for current branch")
 	}
-	return result.Number, nil
+
+	repo, err := repository.Current()
+	if err != nil {
+		return "", "", 0, fmt.Errorf("failed to determine repository: %w", err)
+	}
+	return repo.Owner, repo.Name, result.Number, nil
 }
