@@ -97,7 +97,7 @@ func (c *Client) MinimizeCopilotComments(prNumber int) (int, error) {
 		} `graphql:"repository(owner: $owner, name: $repo)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"owner":  c.owner,
 		"repo":   c.repo,
 		"number": prNumber,
@@ -129,7 +129,7 @@ func (c *Client) MinimizeCopilotComments(prNumber int) (int, error) {
 				}
 			} `graphql:"minimizeComment(input: {subjectId: $id, classifier: OUTDATED})"`
 		}
-		vars := map[string]interface{}{
+		vars := map[string]any{
 			"id": id,
 		}
 		if err := c.gql.Mutate("MinimizeComment", &mutation, vars); err != nil {
