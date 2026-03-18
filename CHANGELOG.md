@@ -1,5 +1,7 @@
 # Changelog
 
+## [v0.1.5](https://github.com/k1LoW/gh-copilot-review/compare/v0.1.4...v0.1.5) - 2026-03-18
+
 ## [v0.1.4](https://github.com/k1LoW/gh-copilot-review/compare/v0.1.3...v0.1.4) - 2026-03-18
 ### Fix bug 🐛
 - fix: minimize review body only, not inline comments by @k1LoW in https://github.com/k1LoW/gh-copilot-review/pull/6
