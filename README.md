@@ -5,7 +5,7 @@
 It is more than a simple wrapper around `gh pr edit --add-reviewer @copilot`:
 
 - **Duplicate prevention** — Skips the request if Copilot is already assigned as a reviewer or has a pending review.
-- **Outdated comment cleanup** — Automatically hides (minimizes as "outdated") previous Copilot review comments before requesting a new review.
+- **Outdated review cleanup** — Automatically hides (minimizes as "outdated") previous Copilot review overviews before requesting a new review.
 
 ## Usage
 
@@ -24,8 +24,8 @@ $ gh copilot-review https://github.com/owner/repo/pull/123
 
 1. **Resolves the PR** — Uses the argument (number or URL), or auto-detects from the current branch via `gh pr view`.
 2. **Checks review status** — If Copilot review is already requested or in progress, exits early with a message.
-3. **Hides old comments** — Minimizes previous Copilot review comments as `OUTDATED` via the GraphQL API.
-4. **Requests review** — Adds `copilot` as a reviewer via the REST API.
+3. **Hides old reviews** — Minimizes previous Copilot review overviews as `OUTDATED` via the GraphQL API.
+4. **Requests review** — Adds `@copilot` as a reviewer via `gh pr edit --add-reviewer @copilot`.
 
 ```console
 $ gh copilot-review 42
