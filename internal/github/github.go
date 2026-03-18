@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	graphql "github.com/cli/shurcooL-graphql"
+
 	"github.com/cli/go-gh/v2/pkg/api"
 )
 
@@ -98,9 +100,9 @@ func (c *Client) MinimizeCopilotComments(prNumber int) (int, error) {
 	}
 
 	variables := map[string]any{
-		"owner":  c.owner,
-		"repo":   c.repo,
-		"number": prNumber,
+		"owner":  graphql.String(c.owner),
+		"repo":   graphql.String(c.repo),
+		"number": graphql.Int(int32(prNumber)), //nolint:gosec // PR numbers won't overflow int32
 	}
 
 	err := c.gql.Query("CopilotReviewComments", &query, variables)
@@ -130,7 +132,7 @@ func (c *Client) MinimizeCopilotComments(prNumber int) (int, error) {
 			} `graphql:"minimizeComment(input: {subjectId: $id, classifier: OUTDATED})"`
 		}
 		vars := map[string]any{
-			"id": id,
+			"id": graphql.ID(id),
 		}
 		if err := c.gql.Mutate("MinimizeComment", &mutation, vars); err != nil {
 			fmt.Printf("Warning: failed to minimize comment %s: %v\n", id, err)
