@@ -1,7 +1,10 @@
 package github
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/cli/go-gh/v2"
@@ -52,23 +55,64 @@ func (c *Client) IsCopilotReviewRequested(prNumber int) (bool, error) {
 	return false, nil
 }
 
-func (c *Client) HasCopilotPendingReview(prNumber int) (bool, error) {
-	var reviews []struct {
+// CopilotReviewStatus holds the result of checking Copilot review state.
+type CopilotReviewStatus struct {
+	Pending bool
+	Fresh   bool
+}
+
+// CheckCopilotReviewStatus fetches reviews once and determines both
+// whether Copilot has a pending review and whether it has already
+// reviewed the current head commit.
+func (c *Client) CheckCopilotReviewStatus(prNumber int) (*CopilotReviewStatus, error) {
+	var pr struct {
+		Head struct {
+			SHA string `json:"sha"`
+		} `json:"head"`
+	}
+	err := c.rest.Get(fmt.Sprintf("repos/%s/%s/pulls/%d", c.owner, c.repo, prNumber), &pr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get PR: %w", err)
+	}
+
+	type review struct {
 		User struct {
 			Login string `json:"login"`
 		} `json:"user"`
-		State string `json:"state"`
+		State    string `json:"state"`
+		CommitID string `json:"commit_id"`
 	}
-	err := c.rest.Get(fmt.Sprintf("repos/%s/%s/pulls/%d/reviews", c.owner, c.repo, prNumber), &reviews)
+	stdout, _, err := gh.Exec("api", "--paginate", "--jq", ".[]",
+		fmt.Sprintf("repos/%s/%s/pulls/%d/reviews?per_page=100", c.owner, c.repo, prNumber))
 	if err != nil {
-		return false, fmt.Errorf("failed to get reviews: %w", err)
+		return nil, fmt.Errorf("failed to get reviews: %w", err)
 	}
+	var reviews []review
+	dec := json.NewDecoder(strings.NewReader(stdout.String()))
+	for {
+		var r review
+		if err := dec.Decode(&r); errors.Is(err, io.EOF) {
+			break
+		} else if err != nil {
+			return nil, fmt.Errorf("failed to parse reviews: %w", err)
+		}
+		reviews = append(reviews, r)
+	}
+
+	status := &CopilotReviewStatus{}
 	for _, r := range reviews {
-		if isCopilotUser(r.User.Login) && r.State == "PENDING" {
-			return true, nil
+		if !isCopilotUser(r.User.Login) {
+			continue
+		}
+		if r.State == "PENDING" {
+			status.Pending = true
+		}
+		if r.CommitID == pr.Head.SHA {
+			status.Fresh = true
 		}
 	}
-	return false, nil
+
+	return status, nil
 }
 
 func (c *Client) RequestCopilotReview(prNumber int) error {

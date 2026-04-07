@@ -61,12 +61,16 @@ func run(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	pending, err := client.HasCopilotPendingReview(prNumber)
+	status, err := client.CheckCopilotReviewStatus(prNumber)
 	if err != nil {
 		return err
 	}
-	if pending {
+	if status.Pending {
 		fmt.Println("Copilot review is in progress")
+		return nil
+	}
+	if status.Fresh {
+		fmt.Println("Copilot review is already up to date for the current head commit")
 		return nil
 	}
 
