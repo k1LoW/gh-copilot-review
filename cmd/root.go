@@ -109,6 +109,9 @@ func run(cmd *cobra.Command, args []string) error {
 		if interval <= 0 {
 			return fmt.Errorf("invalid --wait-interval value: must be greater than 0")
 		}
+		if interval > timeout {
+			return fmt.Errorf("invalid wait settings: --wait-interval (%s) must be less than or equal to --wait-timeout (%s)", interval, timeout)
+		}
 		if err := client.WaitForReviewCompletion(prNumber, timeout, interval); err != nil {
 			return err
 		}
