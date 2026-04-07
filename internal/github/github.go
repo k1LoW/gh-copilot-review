@@ -3,6 +3,7 @@ package github
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/cli/go-gh/v2"
 	graphql "github.com/cli/shurcooL-graphql"
@@ -69,6 +70,50 @@ func (c *Client) HasCopilotPendingReview(prNumber int) (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+func (c *Client) IsCopilotReviewFresh(prNumber int) (bool, error) {
+	// Get the latest commit date on the PR
+	var commits []struct {
+		Commit struct {
+			Committer struct {
+				Date time.Time `json:"date"`
+			} `json:"committer"`
+		} `json:"commit"`
+	}
+	err := c.rest.Get(fmt.Sprintf("repos/%s/%s/pulls/%d/commits", c.owner, c.repo, prNumber), &commits)
+	if err != nil {
+		return false, fmt.Errorf("failed to get PR commits: %w", err)
+	}
+	if len(commits) == 0 {
+		return false, nil
+	}
+	lastCommitDate := commits[len(commits)-1].Commit.Committer.Date
+
+	// Get the latest Copilot review date
+	var reviews []struct {
+		User struct {
+			Login string `json:"login"`
+		} `json:"user"`
+		SubmittedAt time.Time `json:"submitted_at"`
+	}
+	err = c.rest.Get(fmt.Sprintf("repos/%s/%s/pulls/%d/reviews", c.owner, c.repo, prNumber), &reviews)
+	if err != nil {
+		return false, fmt.Errorf("failed to get reviews: %w", err)
+	}
+
+	var latestCopilotReview time.Time
+	for _, r := range reviews {
+		if isCopilotUser(r.User.Login) && r.SubmittedAt.After(latestCopilotReview) {
+			latestCopilotReview = r.SubmittedAt
+		}
+	}
+
+	if latestCopilotReview.IsZero() {
+		return false, nil
+	}
+
+	return latestCopilotReview.After(lastCommitDate), nil
 }
 
 func (c *Client) RequestCopilotReview(prNumber int) error {

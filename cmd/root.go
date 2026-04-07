@@ -70,6 +70,15 @@ func run(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	fresh, err := client.IsCopilotReviewFresh(prNumber)
+	if err != nil {
+		return err
+	}
+	if fresh {
+		fmt.Println("Copilot review is already up to date (newer than the last commit)")
+		return nil
+	}
+
 	if err := client.RequestCopilotReview(prNumber); err != nil {
 		return err
 	}
