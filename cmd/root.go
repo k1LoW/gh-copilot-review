@@ -70,7 +70,7 @@ func run(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 	if status.Fresh {
-		fmt.Println("Copilot review is already up to date (newer than the last commit)")
+		fmt.Println("Copilot review is already up to date for the current head commit")
 		return nil
 	}
 
