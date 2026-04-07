@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
+	"time"
 
 	"github.com/cli/go-gh/v2"
 	graphql "github.com/cli/shurcooL-graphql"
@@ -123,6 +125,85 @@ func (c *Client) RequestCopilotReview(prNumber int) error {
 		return fmt.Errorf("failed to request Copilot review: %w", err)
 	}
 	return nil
+}
+
+func (c *Client) WaitForReviewCompletion(prNumber int, timeout, interval time.Duration) error {
+	sawRequestedOrPending := false
+
+	// Immediate check before entering the polling loop
+	done, requested, err := c.isReviewComplete(prNumber, sawRequestedOrPending)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: %v\n", err)
+	} else if done {
+		return nil
+	} else if requested {
+		sawRequestedOrPending = true
+	}
+
+	deadline := time.After(timeout)
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	start := time.Now()
+	consecutiveErrors := 0
+
+	for {
+		select {
+		case <-deadline:
+			return fmt.Errorf("timed out waiting for Copilot review to complete after %s", timeout)
+		case <-ticker.C:
+			elapsed := time.Since(start).Truncate(time.Second)
+			fmt.Fprintf(os.Stderr, "Waiting for Copilot review... (%s elapsed)\n", elapsed)
+
+			done, requested, err := c.isReviewComplete(prNumber, sawRequestedOrPending)
+			if err != nil {
+				consecutiveErrors++
+				if consecutiveErrors >= 3 {
+					return fmt.Errorf("failed to check review status: %w", err)
+				}
+				fmt.Fprintf(os.Stderr, "Warning: %v\n", err)
+				continue
+			}
+
+			consecutiveErrors = 0
+
+			if requested {
+				sawRequestedOrPending = true
+			}
+
+			if done {
+				return nil
+			}
+		}
+	}
+}
+
+// isReviewComplete checks if the Copilot review has completed.
+// It returns (done, sawRequestedOrPending, error).
+// The !requested && !pending condition is only used as a completion
+// signal when Copilot has been observed as requested/pending at least once,
+// to avoid false positives from API propagation delays.
+func (c *Client) isReviewComplete(prNumber int, sawRequestedOrPending bool) (bool, bool, error) {
+	requested, err := c.IsCopilotReviewRequested(prNumber)
+	if err != nil {
+		return false, false, err
+	}
+
+	status, err := c.CheckCopilotReviewStatus(prNumber)
+	if err != nil {
+		return false, false, err
+	}
+
+	observedActive := requested || status.Pending
+
+	if status.Fresh {
+		return true, observedActive, nil
+	}
+	if sawRequestedOrPending && !requested && !status.Pending {
+		return true, observedActive, nil
+	}
+
+	return false, observedActive, nil
 }
 
 func (c *Client) MinimizeCopilotComments(prNumber int) (int, error) {
