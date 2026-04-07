@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
+	"time"
 
 	"github.com/cli/go-gh/v2"
 	graphql "github.com/cli/shurcooL-graphql"
@@ -123,6 +125,54 @@ func (c *Client) RequestCopilotReview(prNumber int) error {
 		return fmt.Errorf("failed to request Copilot review: %w", err)
 	}
 	return nil
+}
+
+func (c *Client) WaitForReviewCompletion(prNumber int, timeout, interval time.Duration) error {
+	deadline := time.After(timeout)
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	start := time.Now()
+	consecutiveErrors := 0
+
+	for {
+		select {
+		case <-deadline:
+			return fmt.Errorf("timed out waiting for Copilot review to complete after %s", timeout)
+		case <-ticker.C:
+			elapsed := time.Since(start).Truncate(time.Second)
+			fmt.Fprintf(os.Stderr, "Waiting for Copilot review... (%s elapsed)\n", elapsed)
+
+			requested, err := c.IsCopilotReviewRequested(prNumber)
+			if err != nil {
+				consecutiveErrors++
+				if consecutiveErrors >= 3 {
+					return fmt.Errorf("failed to check review status: %w", err)
+				}
+				fmt.Fprintf(os.Stderr, "Warning: %v\n", err)
+				continue
+			}
+
+			status, err := c.CheckCopilotReviewStatus(prNumber)
+			if err != nil {
+				consecutiveErrors++
+				if consecutiveErrors >= 3 {
+					return fmt.Errorf("failed to check review status: %w", err)
+				}
+				fmt.Fprintf(os.Stderr, "Warning: %v\n", err)
+				continue
+			}
+
+			consecutiveErrors = 0
+
+			if status.Fresh {
+				return nil
+			}
+			if !requested && !status.Pending {
+				return nil
+			}
+		}
+	}
 }
 
 func (c *Client) MinimizeCopilotComments(prNumber int) (int, error) {

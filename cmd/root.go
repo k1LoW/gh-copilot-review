@@ -11,11 +11,24 @@ import (
 
 	"github.com/cli/go-gh/v2"
 	"github.com/cli/go-gh/v2/pkg/repository"
+	"github.com/k1LoW/duration"
 	"github.com/spf13/cobra"
 
 	ghclient "github.com/k1LoW/gh-copilot-review/internal/github"
 	"github.com/k1LoW/gh-copilot-review/version"
 )
+
+var (
+	waitFlag     bool
+	waitTimeout  string
+	waitInterval string
+)
+
+func init() {
+	rootCmd.Flags().BoolVar(&waitFlag, "wait", false, "Wait for Copilot review to complete")
+	rootCmd.Flags().StringVar(&waitTimeout, "wait-timeout", "10min", "Timeout for waiting (e.g. 10min, 1h, 30sec)")
+	rootCmd.Flags().StringVar(&waitInterval, "wait-interval", "30sec", "Polling interval for waiting (e.g. 10sec, 30sec, 1min)")
+}
 
 var rootCmd = &cobra.Command{
 	Use:   "gh-copilot-review [<number> | <url>]",
@@ -56,7 +69,7 @@ func run(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	if requested {
+	if requested && !waitFlag {
 		fmt.Println("Copilot review is already requested")
 		return nil
 	}
@@ -65,19 +78,36 @@ func run(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	if status.Pending {
-		fmt.Println("Copilot review is in progress")
-		return nil
-	}
 	if status.Fresh {
 		fmt.Println("Copilot review is already up to date for the current head commit")
 		return nil
 	}
-
-	if err := client.RequestCopilotReview(prNumber); err != nil {
-		return err
+	if status.Pending && !waitFlag {
+		fmt.Println("Copilot review is in progress")
+		return nil
 	}
-	fmt.Printf("Copilot review requested on PR #%d\n", prNumber)
+
+	if !requested && !status.Pending {
+		if err := client.RequestCopilotReview(prNumber); err != nil {
+			return err
+		}
+		fmt.Printf("Copilot review requested on PR #%d\n", prNumber)
+	}
+
+	if waitFlag {
+		timeout, err := duration.Parse(waitTimeout)
+		if err != nil {
+			return fmt.Errorf("invalid --wait-timeout value: %w", err)
+		}
+		interval, err := duration.Parse(waitInterval)
+		if err != nil {
+			return fmt.Errorf("invalid --wait-interval value: %w", err)
+		}
+		if err := client.WaitForReviewCompletion(prNumber, timeout, interval); err != nil {
+			return err
+		}
+		fmt.Printf("Copilot review completed on PR #%d\n", prNumber)
+	}
 
 	return nil
 }
