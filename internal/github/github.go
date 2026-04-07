@@ -95,7 +95,7 @@ func (c *Client) IsCopilotReviewFresh(prNumber int) (bool, error) {
 		User struct {
 			Login string `json:"login"`
 		} `json:"user"`
-		SubmittedAt time.Time `json:"submitted_at"`
+		SubmittedAt *time.Time `json:"submitted_at"`
 	}
 	err = c.rest.Get(fmt.Sprintf("repos/%s/%s/pulls/%d/reviews", c.owner, c.repo, prNumber), &reviews)
 	if err != nil {
@@ -104,8 +104,8 @@ func (c *Client) IsCopilotReviewFresh(prNumber int) (bool, error) {
 
 	var latestCopilotReview time.Time
 	for _, r := range reviews {
-		if isCopilotUser(r.User.Login) && r.SubmittedAt.After(latestCopilotReview) {
-			latestCopilotReview = r.SubmittedAt
+		if isCopilotUser(r.User.Login) && r.SubmittedAt != nil && r.SubmittedAt.After(latestCopilotReview) {
+			latestCopilotReview = *r.SubmittedAt
 		}
 	}
 
