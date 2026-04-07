@@ -52,27 +52,16 @@ func (c *Client) IsCopilotReviewRequested(prNumber int) (bool, error) {
 	return false, nil
 }
 
-func (c *Client) HasCopilotPendingReview(prNumber int) (bool, error) {
-	var reviews []struct {
-		User struct {
-			Login string `json:"login"`
-		} `json:"user"`
-		State string `json:"state"`
-	}
-	err := c.rest.Get(fmt.Sprintf("repos/%s/%s/pulls/%d/reviews", c.owner, c.repo, prNumber), &reviews)
-	if err != nil {
-		return false, fmt.Errorf("failed to get reviews: %w", err)
-	}
-	for _, r := range reviews {
-		if isCopilotUser(r.User.Login) && r.State == "PENDING" {
-			return true, nil
-		}
-	}
-	return false, nil
+// CopilotReviewStatus holds the result of checking Copilot review state.
+type CopilotReviewStatus struct {
+	Pending bool
+	Fresh   bool
 }
 
-func (c *Client) IsCopilotReviewFresh(prNumber int) (bool, error) {
-	// Get the PR head SHA
+// CheckCopilotReviewStatus fetches reviews once and determines both
+// whether Copilot has a pending review and whether it has already
+// reviewed the current head commit.
+func (c *Client) CheckCopilotReviewStatus(prNumber int) (*CopilotReviewStatus, error) {
 	var pr struct {
 		Head struct {
 			SHA string `json:"sha"`
@@ -80,28 +69,35 @@ func (c *Client) IsCopilotReviewFresh(prNumber int) (bool, error) {
 	}
 	err := c.rest.Get(fmt.Sprintf("repos/%s/%s/pulls/%d", c.owner, c.repo, prNumber), &pr)
 	if err != nil {
-		return false, fmt.Errorf("failed to get PR: %w", err)
+		return nil, fmt.Errorf("failed to get PR: %w", err)
 	}
 
-	// Check if any Copilot review was submitted on the current head commit
 	var reviews []struct {
 		User struct {
 			Login string `json:"login"`
 		} `json:"user"`
+		State    string `json:"state"`
 		CommitID string `json:"commit_id"`
 	}
 	err = c.rest.Get(fmt.Sprintf("repos/%s/%s/pulls/%d/reviews?per_page=100", c.owner, c.repo, prNumber), &reviews)
 	if err != nil {
-		return false, fmt.Errorf("failed to get reviews: %w", err)
+		return nil, fmt.Errorf("failed to get reviews: %w", err)
 	}
 
+	status := &CopilotReviewStatus{}
 	for _, r := range reviews {
-		if isCopilotUser(r.User.Login) && r.CommitID == pr.Head.SHA {
-			return true, nil
+		if !isCopilotUser(r.User.Login) {
+			continue
+		}
+		if r.State == "PENDING" {
+			status.Pending = true
+		}
+		if r.CommitID == pr.Head.SHA {
+			status.Fresh = true
 		}
 	}
 
-	return false, nil
+	return status, nil
 }
 
 func (c *Client) RequestCopilotReview(prNumber int) error {
