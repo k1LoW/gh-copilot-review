@@ -130,7 +130,9 @@ func (c *Client) RequestCopilotReview(prNumber int) error {
 func (c *Client) WaitForReviewCompletion(prNumber int, timeout, interval time.Duration) error {
 	// Immediate check before entering the polling loop
 	done, err := c.isReviewComplete(prNumber)
-	if err == nil && done {
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: %v\n", err)
+	} else if done {
 		return nil
 	}
 
