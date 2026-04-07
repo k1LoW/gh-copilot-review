@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.2.0](https://github.com/k1LoW/gh-copilot-review/compare/v0.1.5...v0.2.0) - 2026-04-07
+### New Features 🎉
+- feat: add --wait option to poll until Copilot review completes by @k1LoW in https://github.com/k1LoW/gh-copilot-review/pull/11
+### Other Changes
+- feat: skip Copilot review request when existing review is newer than last commit by @k1LoW in https://github.com/k1LoW/gh-copilot-review/pull/9
+
 ## [v0.1.5](https://github.com/k1LoW/gh-copilot-review/compare/v0.1.4...v0.1.5) - 2026-03-18
 
 ## [v0.1.4](https://github.com/k1LoW/gh-copilot-review/compare/v0.1.3...v0.1.4) - 2026-03-18
