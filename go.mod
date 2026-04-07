@@ -5,6 +5,7 @@ go 1.26.1
 require (
 	github.com/cli/go-gh/v2 v2.13.0
 	github.com/cli/shurcooL-graphql v0.0.4
+	github.com/k1LoW/duration v1.2.0
 	github.com/spf13/cobra v1.10.2
 )
 
@@ -13,7 +14,6 @@ require (
 	github.com/cli/safeexec v1.0.0 // indirect
 	github.com/henvic/httpretty v0.0.6 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-	github.com/k1LoW/duration v1.2.0 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
