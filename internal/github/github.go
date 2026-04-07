@@ -2,7 +2,9 @@ package github
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/cli/go-gh/v2"
@@ -87,9 +89,11 @@ func (c *Client) CheckCopilotReviewStatus(prNumber int) (*CopilotReviewStatus, e
 	}
 	var reviews []review
 	dec := json.NewDecoder(strings.NewReader(stdout.String()))
-	for dec.More() {
+	for {
 		var r review
-		if err := dec.Decode(&r); err != nil {
+		if err := dec.Decode(&r); errors.Is(err, io.EOF) {
+			break
+		} else if err != nil {
 			return nil, fmt.Errorf("failed to parse reviews: %w", err)
 		}
 		reviews = append(reviews, r)
