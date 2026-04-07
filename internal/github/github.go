@@ -80,14 +80,19 @@ func (c *Client) CheckCopilotReviewStatus(prNumber int) (*CopilotReviewStatus, e
 		State    string `json:"state"`
 		CommitID string `json:"commit_id"`
 	}
-	stdout, _, err := gh.Exec("api", "--paginate",
+	stdout, _, err := gh.Exec("api", "--paginate", "--jq", ".[]",
 		fmt.Sprintf("repos/%s/%s/pulls/%d/reviews?per_page=100", c.owner, c.repo, prNumber))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get reviews: %w", err)
 	}
 	var reviews []review
-	if err := json.Unmarshal(stdout.Bytes(), &reviews); err != nil {
-		return nil, fmt.Errorf("failed to parse reviews: %w", err)
+	dec := json.NewDecoder(strings.NewReader(stdout.String()))
+	for dec.More() {
+		var r review
+		if err := dec.Decode(&r); err != nil {
+			return nil, fmt.Errorf("failed to parse reviews: %w", err)
+		}
+		reviews = append(reviews, r)
 	}
 
 	status := &CopilotReviewStatus{}
