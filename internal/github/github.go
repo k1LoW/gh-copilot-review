@@ -1,6 +1,7 @@
 package github
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -72,16 +73,21 @@ func (c *Client) CheckCopilotReviewStatus(prNumber int) (*CopilotReviewStatus, e
 		return nil, fmt.Errorf("failed to get PR: %w", err)
 	}
 
-	var reviews []struct {
+	type review struct {
 		User struct {
 			Login string `json:"login"`
 		} `json:"user"`
 		State    string `json:"state"`
 		CommitID string `json:"commit_id"`
 	}
-	err = c.rest.Get(fmt.Sprintf("repos/%s/%s/pulls/%d/reviews?per_page=100", c.owner, c.repo, prNumber), &reviews)
+	stdout, _, err := gh.Exec("api", "--paginate",
+		fmt.Sprintf("repos/%s/%s/pulls/%d/reviews?per_page=100", c.owner, c.repo, prNumber))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get reviews: %w", err)
+	}
+	var reviews []review
+	if err := json.Unmarshal(stdout.Bytes(), &reviews); err != nil {
+		return nil, fmt.Errorf("failed to parse reviews: %w", err)
 	}
 
 	status := &CopilotReviewStatus{}
