@@ -80,7 +80,7 @@ func run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if minimized > 0 {
-		fmt.Printf("Minimized %d outdated Copilot review comment(s)\n", minimized)
+		fmt.Printf("Minimized %d outdated Copilot review(s)\n", minimized)
 	}
 
 	if !status.Pending {
