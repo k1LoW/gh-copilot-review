@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.2.2](https://github.com/k1LoW/gh-copilot-review/compare/v0.2.1...v0.2.2) - 2026-04-08
+### Fix bug 🐛
+- fix: use GraphQL for CheckCopilotReviewStatus to detect minimized reviews by @k1LoW in https://github.com/k1LoW/gh-copilot-review/pull/14
+
 ## [v0.2.1](https://github.com/k1LoW/gh-copilot-review/compare/v0.2.0...v0.2.1) - 2026-04-08
 ### Fix bug 🐛
 - fix: handle stale Copilot review requests and paginate review queries by @k1LoW in https://github.com/k1LoW/gh-copilot-review/pull/12
