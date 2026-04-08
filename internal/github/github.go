@@ -1,10 +1,7 @@
 package github
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"os"
 	"strings"
 	"time"
@@ -63,55 +60,69 @@ type CopilotReviewStatus struct {
 	Fresh   bool
 }
 
-// CheckCopilotReviewStatus fetches reviews once and determines both
+// CheckCopilotReviewStatus fetches reviews via GraphQL and determines both
 // whether Copilot has a pending review and whether it has already
 // reviewed the current head commit.
+// GraphQL is used instead of REST because the REST reviews endpoint
+// excludes minimized reviews.
 func (c *Client) CheckCopilotReviewStatus(prNumber int) (*CopilotReviewStatus, error) {
-	var pr struct {
-		Head struct {
-			SHA string `json:"sha"`
-		} `json:"head"`
-	}
-	err := c.rest.Get(fmt.Sprintf("repos/%s/%s/pulls/%d", c.owner, c.repo, prNumber), &pr)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get PR: %w", err)
+	var query struct {
+		Repository struct {
+			PullRequest struct {
+				HeadRefOid string `graphql:"headRefOid"`
+				Reviews    struct {
+					Nodes []struct {
+						Author struct {
+							Login string
+						}
+						State  string
+						Commit struct {
+							Oid string
+						}
+					}
+					PageInfo struct {
+						HasNextPage bool
+						EndCursor   string
+					}
+				} `graphql:"reviews(first: 100, after: $cursor)"`
+			} `graphql:"pullRequest(number: $number)"`
+		} `graphql:"repository(owner: $owner, name: $repo)"`
 	}
 
-	type review struct {
-		User struct {
-			Login string `json:"login"`
-		} `json:"user"`
-		State    string `json:"state"`
-		CommitID string `json:"commit_id"`
-	}
-	stdout, _, err := gh.Exec("api", "--paginate", "--jq", ".[]",
-		fmt.Sprintf("repos/%s/%s/pulls/%d/reviews?per_page=100", c.owner, c.repo, prNumber))
-	if err != nil {
-		return nil, fmt.Errorf("failed to get reviews: %w", err)
-	}
-	var reviews []review
-	dec := json.NewDecoder(strings.NewReader(stdout.String()))
-	for {
-		var r review
-		if err := dec.Decode(&r); errors.Is(err, io.EOF) {
-			break
-		} else if err != nil {
-			return nil, fmt.Errorf("failed to parse reviews: %w", err)
-		}
-		reviews = append(reviews, r)
+	variables := map[string]any{
+		"owner":  graphql.String(c.owner),
+		"repo":   graphql.String(c.repo),
+		"number": graphql.Int(int32(prNumber)), //nolint:gosec // PR numbers won't overflow int32
+		"cursor": (*graphql.String)(nil),
 	}
 
 	status := &CopilotReviewStatus{}
-	for _, r := range reviews {
-		if !isCopilotUser(r.User.Login) {
-			continue
+	var headRefOid string
+	for {
+		err := c.gql.Query("CopilotReviewStatus", &query, variables)
+		if err != nil {
+			return nil, fmt.Errorf("failed to query review status: %w", err)
 		}
-		if r.State == "PENDING" {
-			status.Pending = true
+
+		headRefOid = query.Repository.PullRequest.HeadRefOid
+
+		for _, r := range query.Repository.PullRequest.Reviews.Nodes {
+			if !isCopilotUser(r.Author.Login) {
+				continue
+			}
+			if r.State == "PENDING" {
+				status.Pending = true
+			}
+			if r.State != "PENDING" && r.Commit.Oid == headRefOid {
+				status.Fresh = true
+			}
 		}
-		if r.CommitID == pr.Head.SHA {
-			status.Fresh = true
+
+		if (status.Pending && status.Fresh) || !query.Repository.PullRequest.Reviews.PageInfo.HasNextPage {
+			break
 		}
+		cursor := graphql.String(query.Repository.PullRequest.Reviews.PageInfo.EndCursor)
+		variables["cursor"] = &cursor
 	}
 
 	return status, nil
