@@ -118,7 +118,7 @@ func (c *Client) CheckCopilotReviewStatus(prNumber int) (*CopilotReviewStatus, e
 			}
 		}
 
-		if !query.Repository.PullRequest.Reviews.PageInfo.HasNextPage {
+		if (status.Pending && status.Fresh) || !query.Repository.PullRequest.Reviews.PageInfo.HasNextPage {
 			break
 		}
 		cursor := graphql.String(query.Repository.PullRequest.Reviews.PageInfo.EndCursor)
