@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.2.1](https://github.com/k1LoW/gh-copilot-review/compare/v0.2.0...v0.2.1) - 2026-04-08
+### Fix bug 🐛
+- fix: handle stale Copilot review requests and paginate review queries by @k1LoW in https://github.com/k1LoW/gh-copilot-review/pull/12
+
 ## [v0.2.0](https://github.com/k1LoW/gh-copilot-review/compare/v0.1.5...v0.2.0) - 2026-04-07
 ### New Features 🎉
 - feat: add --wait option to poll until Copilot review completes by @k1LoW in https://github.com/k1LoW/gh-copilot-review/pull/11
