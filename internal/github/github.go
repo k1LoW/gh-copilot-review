@@ -113,7 +113,7 @@ func (c *Client) CheckCopilotReviewStatus(prNumber int) (*CopilotReviewStatus, e
 			if r.State == "PENDING" {
 				status.Pending = true
 			}
-			if r.Commit.Oid == headRefOid {
+			if r.State != "PENDING" && r.Commit.Oid == headRefOid {
 				status.Fresh = true
 			}
 		}
