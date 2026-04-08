@@ -218,7 +218,11 @@ func (c *Client) MinimizeCopilotComments(prNumber int) (int, error) {
 							Login string
 						}
 					}
-				} `graphql:"reviews(first: 100)"`
+					PageInfo struct {
+						HasNextPage bool
+						EndCursor   string
+					}
+				} `graphql:"reviews(first: 100, after: $cursor)"`
 			} `graphql:"pullRequest(number: $number)"`
 		} `graphql:"repository(owner: $owner, name: $repo)"`
 	}
@@ -227,21 +231,30 @@ func (c *Client) MinimizeCopilotComments(prNumber int) (int, error) {
 		"owner":  graphql.String(c.owner),
 		"repo":   graphql.String(c.repo),
 		"number": graphql.Int(int32(prNumber)), //nolint:gosec // PR numbers won't overflow int32
-	}
-
-	err := c.gql.Query("CopilotReviewComments", &query, variables)
-	if err != nil {
-		return 0, fmt.Errorf("failed to query review comments: %w", err)
+		"cursor": (*graphql.String)(nil),
 	}
 
 	var subjectIDs []string
-	for _, review := range query.Repository.PullRequest.Reviews.Nodes {
-		if !isCopilotUser(review.Author.Login) {
-			continue
+	for {
+		err := c.gql.Query("CopilotReviewComments", &query, variables)
+		if err != nil {
+			return 0, fmt.Errorf("failed to query review comments: %w", err)
 		}
-		if !review.IsMinimized {
-			subjectIDs = append(subjectIDs, review.ID)
+
+		for _, review := range query.Repository.PullRequest.Reviews.Nodes {
+			if !isCopilotUser(review.Author.Login) {
+				continue
+			}
+			if !review.IsMinimized {
+				subjectIDs = append(subjectIDs, review.ID)
+			}
 		}
+
+		if !query.Repository.PullRequest.Reviews.PageInfo.HasNextPage {
+			break
+		}
+		cursor := graphql.String(query.Repository.PullRequest.Reviews.PageInfo.EndCursor)
+		variables["cursor"] = &cursor
 	}
 
 	minimized := 0
