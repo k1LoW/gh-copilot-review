@@ -69,10 +69,6 @@ func run(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	if requested && !waitFlag {
-		fmt.Println("Copilot review is already requested")
-		return nil
-	}
 
 	status, err := client.CheckCopilotReviewStatus(prNumber)
 	if err != nil {
@@ -87,11 +83,21 @@ func run(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	if !requested && !status.Pending {
-		if err := client.RequestCopilotReview(prNumber); err != nil {
-			return err
+	if !status.Pending {
+		if requested && !status.Fresh {
+			// Copilot is listed as a requested reviewer but has no pending or
+			// fresh review. This is a stale request from a previous review
+			// cycle, so re-request to trigger a review for the current HEAD.
+			if err := client.RequestCopilotReview(prNumber); err != nil {
+				return err
+			}
+			fmt.Printf("Copilot review re-requested on PR #%d (stale request detected)\n", prNumber)
+		} else if !requested {
+			if err := client.RequestCopilotReview(prNumber); err != nil {
+				return err
+			}
+			fmt.Printf("Copilot review requested on PR #%d\n", prNumber)
 		}
-		fmt.Printf("Copilot review requested on PR #%d\n", prNumber)
 	}
 
 	if waitFlag {
