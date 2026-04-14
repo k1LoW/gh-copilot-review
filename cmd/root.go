@@ -19,12 +19,14 @@ import (
 )
 
 var (
+	forceFlag    bool
 	waitFlag     bool
 	waitTimeout  string
 	waitInterval string
 )
 
 func init() {
+	rootCmd.Flags().BoolVar(&forceFlag, "force", false, "Force request Copilot review, ignoring all pre-conditions")
 	rootCmd.Flags().BoolVar(&waitFlag, "wait", false, "Wait for Copilot review to complete")
 	rootCmd.Flags().StringVar(&waitTimeout, "wait-timeout", "10min", "Timeout for waiting (e.g. 10min, 1h, 30sec)")
 	rootCmd.Flags().StringVar(&waitInterval, "wait-interval", "30sec", "Polling interval for waiting (e.g. 10sec, 30sec, 1min)")
@@ -57,46 +59,60 @@ func run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	requested, err := client.IsCopilotReviewRequested(prNumber)
-	if err != nil {
-		return err
-	}
+	if forceFlag {
+		minimized, err := client.MinimizeCopilotComments(prNumber)
+		if err != nil {
+			return err
+		}
+		if minimized > 0 {
+			fmt.Printf("Minimized %d outdated Copilot review(s)\n", minimized)
+		}
+		if err := client.RequestCopilotReview(prNumber); err != nil {
+			return err
+		}
+		fmt.Printf("Copilot review force-requested on PR #%d\n", prNumber)
+	} else {
+		requested, err := client.IsCopilotReviewRequested(prNumber)
+		if err != nil {
+			return err
+		}
 
-	status, err := client.CheckCopilotReviewStatus(prNumber)
-	if err != nil {
-		return err
-	}
-	if status.Fresh {
-		fmt.Println("Copilot review is already up to date for the current head commit")
-		return nil
-	}
-	if status.Pending && !waitFlag {
-		fmt.Println("Copilot review is in progress")
-		return nil
-	}
+		status, err := client.CheckCopilotReviewStatus(prNumber)
+		if err != nil {
+			return err
+		}
+		if status.Fresh {
+			fmt.Println("Copilot review is already up to date for the current head commit")
+			return nil
+		}
+		if status.Pending && !waitFlag {
+			fmt.Println("Copilot review is in progress")
+			return nil
+		}
 
-	minimized, err := client.MinimizeCopilotComments(prNumber)
-	if err != nil {
-		return err
-	}
-	if minimized > 0 {
-		fmt.Printf("Minimized %d outdated Copilot review(s)\n", minimized)
-	}
+		minimized, err := client.MinimizeCopilotComments(prNumber)
+		if err != nil {
+			return err
+		}
+		if minimized > 0 {
+			fmt.Printf("Minimized %d outdated Copilot review(s)\n", minimized)
+		}
 
-	if !status.Pending {
-		if requested && !status.Fresh {
-			// Copilot is listed as a requested reviewer but has no pending or
-			// fresh review. This is a stale request from a previous review
-			// cycle, so re-request to trigger a review for the current HEAD.
-			if err := client.RequestCopilotReview(prNumber); err != nil {
-				return err
+		if !status.Pending {
+			if requested && !status.Fresh {
+				// Copilot is listed as a requested reviewer but has no pending or
+				// fresh review. This is a stale request from a previous review
+				// cycle, so re-request to trigger a review for the current HEAD.
+				if err := client.RequestCopilotReview(prNumber); err != nil {
+					return err
+				}
+				fmt.Printf("Copilot review re-requested on PR #%d (stale request detected)\n", prNumber)
+			} else if !requested {
+				if err := client.RequestCopilotReview(prNumber); err != nil {
+					return err
+				}
+				fmt.Printf("Copilot review requested on PR #%d\n", prNumber)
 			}
-			fmt.Printf("Copilot review re-requested on PR #%d (stale request detected)\n", prNumber)
-		} else if !requested {
-			if err := client.RequestCopilotReview(prNumber); err != nil {
-				return err
-			}
-			fmt.Printf("Copilot review requested on PR #%d\n", prNumber)
 		}
 	}
 
