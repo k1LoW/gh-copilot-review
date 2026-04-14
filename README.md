@@ -25,6 +25,9 @@ $ gh copilot-review --wait
 
 # Customize timeout and polling interval
 $ gh copilot-review --wait --wait-timeout 5min --wait-interval 10sec
+
+# Force request, ignoring all pre-conditions
+$ gh copilot-review --force
 ```
 
 ### What it does
@@ -54,6 +57,7 @@ Copilot review completed on PR #42
 
 | Flag | Default | Description |
 |------|---------|-------------|
+| `--force` | `false` | Force request Copilot review, ignoring all pre-conditions |
 | `--wait` | `false` | Wait for Copilot review to complete |
 | `--wait-timeout` | `10min` | Timeout for waiting (e.g. `10min`, `1h`, `30sec`) |
 | `--wait-interval` | `30sec` | Polling interval for waiting (e.g. `10sec`, `30sec`, `1min`) |
