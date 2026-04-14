@@ -64,7 +64,7 @@ type CopilotReviewStatus struct {
 // whether Copilot has a pending review and whether it has already
 // reviewed the current head commit.
 // GraphQL is used instead of REST because the REST reviews endpoint
-// excludes minimized reviews.
+// does not expose PENDING reviews or the IsMinimized field.
 func (c *Client) CheckCopilotReviewStatus(prNumber int) (*CopilotReviewStatus, error) {
 	var query struct {
 		Repository struct {
