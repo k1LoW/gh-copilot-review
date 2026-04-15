@@ -64,7 +64,7 @@ type CopilotReviewStatus struct {
 // whether Copilot has a pending review and whether it has already
 // reviewed the current head commit.
 // GraphQL is used instead of REST because the REST reviews endpoint
-// excludes minimized reviews.
+// does not expose PENDING reviews or the IsMinimized field.
 func (c *Client) CheckCopilotReviewStatus(prNumber int) (*CopilotReviewStatus, error) {
 	var query struct {
 		Repository struct {
@@ -75,8 +75,9 @@ func (c *Client) CheckCopilotReviewStatus(prNumber int) (*CopilotReviewStatus, e
 						Author struct {
 							Login string
 						}
-						State  string
-						Commit struct {
+						State       string
+						IsMinimized bool `graphql:"isMinimized"`
+						Commit      struct {
 							Oid string
 						}
 					}
@@ -108,6 +109,9 @@ func (c *Client) CheckCopilotReviewStatus(prNumber int) (*CopilotReviewStatus, e
 
 		for _, r := range query.Repository.PullRequest.Reviews.Nodes {
 			if !isCopilotUser(r.Author.Login) {
+				continue
+			}
+			if r.IsMinimized {
 				continue
 			}
 			if r.State == "PENDING" {
