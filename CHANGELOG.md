@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.3.1](https://github.com/k1LoW/gh-copilot-review/compare/v0.3.0...v0.3.1) - 2026-04-15
+### Dependency Updates ⬆️
+- chore(deps): bump softprops/action-gh-release from 2 to 3 in the dependencies group by @dependabot[bot] in https://github.com/k1LoW/gh-copilot-review/pull/19
+### Other Changes
+- fix: exclude minimized reviews from CheckCopilotReviewStatus by @k1LoW in https://github.com/k1LoW/gh-copilot-review/pull/18
+
 ## [v0.3.0](https://github.com/k1LoW/gh-copilot-review/compare/v0.2.2...v0.3.0) - 2026-04-14
 ### New Features 🎉
 - feat: add --force flag to skip all pre-conditions by @k1LoW in https://github.com/k1LoW/gh-copilot-review/pull/16
