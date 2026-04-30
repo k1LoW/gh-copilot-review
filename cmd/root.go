@@ -145,6 +145,8 @@ func run(cmd *cobra.Command, args []string) error {
 		}
 		if inlineCount == 0 {
 			fmt.Println("No new inline review comments from Copilot")
+		} else {
+			fmt.Printf("Copilot left %d new inline review comment(s)\n", inlineCount)
 		}
 	}
 

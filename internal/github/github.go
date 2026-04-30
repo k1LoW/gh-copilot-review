@@ -145,6 +145,7 @@ func (c *Client) CountFreshCopilotInlineComments(prNumber int) (int, error) {
 						Author struct {
 							Login string
 						}
+						State       string
 						IsMinimized bool `graphql:"isMinimized"`
 						Commit      struct {
 							Oid string
@@ -182,6 +183,9 @@ func (c *Client) CountFreshCopilotInlineComments(prNumber int) (int, error) {
 				continue
 			}
 			if r.IsMinimized {
+				continue
+			}
+			if r.State == "PENDING" {
 				continue
 			}
 			if r.Commit.Oid != head {
@@ -279,7 +283,7 @@ func (c *Client) isReviewComplete(prNumber int, sawRequestedOrPending bool) (boo
 
 	observedActive := requested || status.Pending
 
-	if status.Fresh {
+	if status.Fresh && !status.Pending {
 		return true, observedActive, nil
 	}
 	if sawRequestedOrPending && !requested && !status.Pending {
