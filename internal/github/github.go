@@ -133,8 +133,8 @@ func (c *Client) CheckCopilotReviewStatus(prNumber int) (*CopilotReviewStatus, e
 }
 
 // CountFreshCopilotInlineComments returns the number of inline review
-// comments authored by Copilot on reviews of the current head commit.
-// Minimized reviews are skipped.
+// comments authored by Copilot on submitted (non-PENDING), non-minimized
+// reviews tied to the current head commit.
 func (c *Client) CountFreshCopilotInlineComments(prNumber int) (int, error) {
 	var query struct {
 		Repository struct {
