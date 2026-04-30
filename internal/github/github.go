@@ -132,6 +132,74 @@ func (c *Client) CheckCopilotReviewStatus(prNumber int) (*CopilotReviewStatus, e
 	return status, nil
 }
 
+// CountFreshCopilotInlineComments returns the number of inline review
+// comments authored by Copilot on reviews of the current head commit.
+// Minimized reviews are skipped.
+func (c *Client) CountFreshCopilotInlineComments(prNumber int) (int, error) {
+	var query struct {
+		Repository struct {
+			PullRequest struct {
+				HeadRefOid string `graphql:"headRefOid"`
+				Reviews    struct {
+					Nodes []struct {
+						Author struct {
+							Login string
+						}
+						IsMinimized bool `graphql:"isMinimized"`
+						Commit      struct {
+							Oid string
+						}
+						Comments struct {
+							TotalCount int
+						} `graphql:"comments(first: 1)"`
+					}
+					PageInfo struct {
+						HasNextPage bool
+						EndCursor   string
+					}
+				} `graphql:"reviews(first: 100, after: $cursor)"`
+			} `graphql:"pullRequest(number: $number)"`
+		} `graphql:"repository(owner: $owner, name: $repo)"`
+	}
+
+	variables := map[string]any{
+		"owner":  graphql.String(c.owner),
+		"repo":   graphql.String(c.repo),
+		"number": graphql.Int(int32(prNumber)), //nolint:gosec // PR numbers won't overflow int32
+		"cursor": (*graphql.String)(nil),
+	}
+
+	count := 0
+	for {
+		err := c.gql.Query("CopilotInlineCommentCount", &query, variables)
+		if err != nil {
+			return 0, fmt.Errorf("failed to query inline review comments: %w", err)
+		}
+
+		head := query.Repository.PullRequest.HeadRefOid
+		for _, r := range query.Repository.PullRequest.Reviews.Nodes {
+			if !isCopilotUser(r.Author.Login) {
+				continue
+			}
+			if r.IsMinimized {
+				continue
+			}
+			if r.Commit.Oid != head {
+				continue
+			}
+			count += r.Comments.TotalCount
+		}
+
+		if !query.Repository.PullRequest.Reviews.PageInfo.HasNextPage {
+			break
+		}
+		cursor := graphql.String(query.Repository.PullRequest.Reviews.PageInfo.EndCursor)
+		variables["cursor"] = &cursor
+	}
+
+	return count, nil
+}
+
 func (c *Client) RequestCopilotReview(prNumber int) error {
 	_, _, err := gh.Exec("pr", "edit", fmt.Sprintf("%d", prNumber),
 		"--add-reviewer", "@copilot",

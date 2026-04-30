@@ -138,6 +138,14 @@ func run(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		fmt.Printf("Copilot review completed on PR #%d\n", prNumber)
+
+		inlineCount, err := client.CountFreshCopilotInlineComments(prNumber)
+		if err != nil {
+			return err
+		}
+		if inlineCount == 0 {
+			fmt.Println("No new inline review comments from Copilot")
+		}
 	}
 
 	return nil
