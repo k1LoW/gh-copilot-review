@@ -139,14 +139,24 @@ func run(cmd *cobra.Command, args []string) error {
 		}
 		fmt.Printf("Copilot review completed on PR #%d\n", prNumber)
 
-		inlineCount, err := client.CountFreshCopilotInlineComments(prNumber)
+		// Only report inline comment count when a fresh Copilot review for
+		// the current head commit is actually visible. WaitForReviewCompletion
+		// can return via the propagation fallback (Copilot left without
+		// reviewing), in which case the count is meaningless.
+		postStatus, err := client.CheckCopilotReviewStatus(prNumber)
 		if err != nil {
 			return err
 		}
-		if inlineCount == 0 {
-			fmt.Println("No new inline review comments from Copilot")
-		} else {
-			fmt.Printf("Copilot left %d new inline review comment(s)\n", inlineCount)
+		if postStatus.Fresh {
+			inlineCount, err := client.CountFreshCopilotInlineComments(prNumber)
+			if err != nil {
+				return err
+			}
+			if inlineCount == 0 {
+				fmt.Println("No new inline review comments from Copilot")
+			} else {
+				fmt.Printf("Copilot left %d new inline review comment(s)\n", inlineCount)
+			}
 		}
 	}
 
