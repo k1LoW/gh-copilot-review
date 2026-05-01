@@ -3,7 +3,7 @@ name: request-copilot-review
 description: >
   Requests a Copilot code review on a pull request using gh-copilot-review and waits until it completes.
   Resolves the target PR (from argument or current branch), runs the request, and reports the outcome
-  including whether Copilot left any new inline review comments.
+  including how many unresolved Copilot inline review comments remain on the current head commit.
   Use when the user wants to ask Copilot to review a PR or re-request a review.
 compatibility: Requires gh CLI and gh-copilot-review extension (gh extension install k1LoW/gh-copilot-review)
 ---
@@ -31,7 +31,7 @@ Notes:
 
 - The command may take several minutes. Use a generous Bash timeout (e.g., 15 minutes when `--wait-timeout` is the default `10min`; longer if the user raised it).
 - Without `<arg>`, omit it from the command. `gh copilot-review` auto-detects the PR for the current branch the same way.
-- The command itself handles duplicate prevention. With `--wait`, in-progress reviews are polled to completion rather than skipped, so the only early-exit case to handle is when the current head commit already has a fresh Copilot review. In that case the command prints `Copilot review is already up to date for the current head commit` and exits. Surface that message verbatim and ask the user whether to re-run with `--force`.
+- The command itself handles duplicate prevention. With `--wait`, in-progress reviews are polled to completion rather than skipped, so the only early-exit case to handle is when the current head commit already has a fresh Copilot review. In that case the command prints `Copilot review is already up to date for the current head commit` and (under `--wait`) follows it with the unresolved inline comment count line described below. Surface the "already up to date" message verbatim and ask the user whether to re-run with `--force`.
 
 ## Phase 3: Report the Outcome
 
@@ -42,22 +42,22 @@ Parse the command output and present a short summary:
 
 - Status: <Completed | Skipped (already reviewed) | Timed out | Failed>
 - Outdated reviews minimized: <n> (omit if 0)
-- Inline review comments: <n new | none | unknown>
+- Unresolved inline review comments: <n | none | unknown>
 - URL: <pr url>
 ```
 
-How to fill in **Inline review comments** for a **Completed** review:
+How to fill in **Unresolved inline review comments** for a **Completed** or **Skipped (already reviewed)** review:
 
-- If the output contains `Copilot left N new inline review comment(s)`, report `N new`.
-- If the output contains `No new inline review comments from Copilot`, report `none`.
+- If the output contains `Copilot has N unresolved inline review comment(s)`, report `N`.
+- If the output contains `No unresolved inline review comments from Copilot`, report `none`.
 - If neither line is present (e.g., `WaitForReviewCompletion` returned via the propagation fallback because Copilot left without leaving a fresh review), report `unknown` and note that no fresh Copilot review for the current head was detected.
 
-For other statuses, omit the **Inline review comments** line.
+For other statuses, omit the **Unresolved inline review comments** line.
 
 Then, depending on status:
 
 - **Completed**: Done. The summary above is the final report.
-- **Skipped (already reviewed)**: Explain why (per the command output) and offer to re-run with `--force` if the user wants to override.
+- **Skipped (already reviewed)**: Explain why (per the command output). If the unresolved count line shows remaining comments, point the user at those first. Offer to re-run with `--force` if the user wants to discard the existing review and request a fresh one.
 - **Timed out**: Tell the user Copilot did not finish within the timeout. Offer to re-run with a larger `--wait-timeout`, or to check the PR manually.
 - **Failed**: Surface the error verbatim. Do not retry automatically.
 

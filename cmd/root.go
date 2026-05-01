@@ -83,6 +83,11 @@ func run(cmd *cobra.Command, args []string) error {
 		}
 		if status.Fresh {
 			fmt.Println("Copilot review is already up to date for the current head commit")
+			if waitFlag {
+				if err := reportUnresolvedInlineComments(client, prNumber); err != nil {
+					return err
+				}
+			}
 			return nil
 		}
 		if status.Pending && !waitFlag {
@@ -148,18 +153,25 @@ func run(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		if postStatus.Fresh {
-			inlineCount, err := client.CountFreshCopilotInlineComments(prNumber)
-			if err != nil {
+			if err := reportUnresolvedInlineComments(client, prNumber); err != nil {
 				return err
-			}
-			if inlineCount == 0 {
-				fmt.Println("No new inline review comments from Copilot")
-			} else {
-				fmt.Printf("Copilot left %d new inline review comment(s)\n", inlineCount)
 			}
 		}
 	}
 
+	return nil
+}
+
+func reportUnresolvedInlineComments(client *ghclient.Client, prNumber int) error {
+	count, err := client.CountUnresolvedCopilotInlineComments(prNumber)
+	if err != nil {
+		return err
+	}
+	if count == 0 {
+		fmt.Println("No unresolved inline review comments from Copilot")
+	} else {
+		fmt.Printf("Copilot has %d unresolved inline review comment(s)\n", count)
+	}
 	return nil
 }
 

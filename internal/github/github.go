@@ -132,33 +132,39 @@ func (c *Client) CheckCopilotReviewStatus(prNumber int) (*CopilotReviewStatus, e
 	return status, nil
 }
 
-// CountFreshCopilotInlineComments returns the number of inline review
-// comments authored by Copilot on submitted (non-PENDING), non-minimized
-// reviews tied to the current head commit.
-func (c *Client) CountFreshCopilotInlineComments(prNumber int) (int, error) {
+// CountUnresolvedCopilotInlineComments returns the number of unresolved
+// inline review threads whose originating comment was authored by Copilot
+// on a submitted (non-PENDING), non-minimized review tied to the current
+// head commit. Each thread corresponds to one inline comment location, so
+// this counts distinct unresolved points raised by Copilot on HEAD.
+func (c *Client) CountUnresolvedCopilotInlineComments(prNumber int) (int, error) {
 	var query struct {
 		Repository struct {
 			PullRequest struct {
-				HeadRefOid string `graphql:"headRefOid"`
-				Reviews    struct {
+				HeadRefOid   string `graphql:"headRefOid"`
+				ReviewThreads struct {
 					Nodes []struct {
-						Author struct {
-							Login string
-						}
-						State       string
-						IsMinimized bool `graphql:"isMinimized"`
-						Commit      struct {
-							Oid string
-						}
-						Comments struct {
-							TotalCount int
+						IsResolved bool `graphql:"isResolved"`
+						Comments   struct {
+							Nodes []struct {
+								Author struct {
+									Login string
+								}
+								PullRequestReview struct {
+									State       string
+									IsMinimized bool `graphql:"isMinimized"`
+									Commit      struct {
+										Oid string
+									}
+								} `graphql:"pullRequestReview"`
+							}
 						} `graphql:"comments(first: 1)"`
 					}
 					PageInfo struct {
 						HasNextPage bool
 						EndCursor   string
 					}
-				} `graphql:"reviews(first: 100, after: $cursor)"`
+				} `graphql:"reviewThreads(first: 100, after: $cursor)"`
 			} `graphql:"pullRequest(number: $number)"`
 		} `graphql:"repository(owner: $owner, name: $repo)"`
 	}
@@ -172,32 +178,40 @@ func (c *Client) CountFreshCopilotInlineComments(prNumber int) (int, error) {
 
 	count := 0
 	for {
-		err := c.gql.Query("CopilotInlineCommentCount", &query, variables)
+		err := c.gql.Query("CopilotUnresolvedInlineCommentCount", &query, variables)
 		if err != nil {
-			return 0, fmt.Errorf("failed to query inline review comments: %w", err)
+			return 0, fmt.Errorf("failed to query inline review threads: %w", err)
 		}
 
 		head := query.Repository.PullRequest.HeadRefOid
-		for _, r := range query.Repository.PullRequest.Reviews.Nodes {
-			if !isCopilotUser(r.Author.Login) {
+		for _, t := range query.Repository.PullRequest.ReviewThreads.Nodes {
+			if t.IsResolved {
 				continue
 			}
-			if r.IsMinimized {
+			if len(t.Comments.Nodes) == 0 {
 				continue
 			}
-			if r.State == "PENDING" {
+			origin := t.Comments.Nodes[0]
+			if !isCopilotUser(origin.Author.Login) {
 				continue
 			}
-			if r.Commit.Oid != head {
+			review := origin.PullRequestReview
+			if review.IsMinimized {
 				continue
 			}
-			count += r.Comments.TotalCount
+			if review.State == "PENDING" {
+				continue
+			}
+			if review.Commit.Oid != head {
+				continue
+			}
+			count++
 		}
 
-		if !query.Repository.PullRequest.Reviews.PageInfo.HasNextPage {
+		if !query.Repository.PullRequest.ReviewThreads.PageInfo.HasNextPage {
 			break
 		}
-		cursor := graphql.String(query.Repository.PullRequest.Reviews.PageInfo.EndCursor)
+		cursor := graphql.String(query.Repository.PullRequest.ReviewThreads.PageInfo.EndCursor)
 		variables["cursor"] = &cursor
 	}
 
