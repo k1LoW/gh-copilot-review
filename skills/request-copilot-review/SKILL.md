@@ -31,7 +31,7 @@ Notes:
 
 - The command may take several minutes. Use a generous Bash timeout (e.g., 15 minutes when `--wait-timeout` is the default `10min`; longer if the user raised it).
 - Without `<arg>`, omit it from the command. `gh copilot-review` auto-detects the PR for the current branch the same way.
-- The command itself handles duplicate prevention (skips when Copilot is already a reviewer, has a pending review, or has reviewed the current head). If it exits early with a "skipped" message, surface that message verbatim and ask the user whether to re-run with `--force`.
+- The command itself handles duplicate prevention. With `--wait`, in-progress reviews are polled to completion rather than skipped, so the only early-exit case to handle is when the current head commit already has a fresh Copilot review. In that case the command prints `Copilot review is already up to date for the current head commit` and exits. Surface that message verbatim and ask the user whether to re-run with `--force`.
 
 ## Phase 3: Report the Outcome
 
