@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.4.0](https://github.com/k1LoW/gh-copilot-review/compare/v0.3.1...v0.4.0) - 2026-05-01
+### New Features 🎉
+- feat: report inline review comment count after --wait by @k1LoW in https://github.com/k1LoW/gh-copilot-review/pull/21
+- feat: add request-copilot-review skill by @k1LoW in https://github.com/k1LoW/gh-copilot-review/pull/23
+
 ## [v0.3.1](https://github.com/k1LoW/gh-copilot-review/compare/v0.3.0...v0.3.1) - 2026-04-15
 ### Dependency Updates ⬆️
 - chore(deps): bump softprops/action-gh-release from 2 to 3 in the dependencies group by @dependabot[bot] in https://github.com/k1LoW/gh-copilot-review/pull/19
