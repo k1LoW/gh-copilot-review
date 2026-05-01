@@ -40,7 +40,7 @@ Parse the command output and present a short summary:
 ```
 ## Copilot Review for PR #<number> (<title>)
 
-- Status: <Completed | Skipped (already reviewed) | Skipped (in progress) | Timed out | Failed>
+- Status: <Completed | Skipped (already reviewed) | Timed out | Failed>
 - Outdated reviews minimized: <n> (omit if 0)
 - Inline review comments: <n new | none | unknown>
 - URL: <pr url>
@@ -57,7 +57,7 @@ For other statuses, omit the **Inline review comments** line.
 Then, depending on status:
 
 - **Completed**: Done. The summary above is the final report.
-- **Skipped (already reviewed / in progress)**: Explain why (per the command output) and offer to re-run with `--force` if the user wants to override.
+- **Skipped (already reviewed)**: Explain why (per the command output) and offer to re-run with `--force` if the user wants to override.
 - **Timed out**: Tell the user Copilot did not finish within the timeout. Offer to re-run with a larger `--wait-timeout`, or to check the PR manually.
 - **Failed**: Surface the error verbatim. Do not retry automatically.
 
