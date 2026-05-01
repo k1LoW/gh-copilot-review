@@ -67,3 +67,21 @@ Copilot review completed on PR #42
 ```bash
 $ gh extension install k1LoW/gh-copilot-review
 ```
+
+## Agent Skill
+
+This repository includes an example [Agent Skill](https://agentskills.io/), [**request-copilot-review**](skills/request-copilot-review/SKILL.md). It uses `gh copilot-review --wait` to request a Copilot review on a pull request, waits until it completes, and reports whether Copilot left any new inline review comments.
+
+You can install it via [skills.sh](https://skills.sh/):
+
+```bash
+$ npx skills add k1LoW/gh-copilot-review
+```
+
+Or via [`gh skill`](https://cli.github.com/manual/gh_skill) (preview):
+
+```bash
+$ gh skill install k1LoW/gh-copilot-review request-copilot-review
+```
+
+Or manually copy [`skills/request-copilot-review/SKILL.md`](skills/request-copilot-review/SKILL.md) to a location recognized by your agent (e.g., `.claude/skills/` for [Claude Code](https://docs.anthropic.com/en/docs/claude-code), `.github/skills/` for [GitHub Copilot Coding Agent](https://docs.github.com/en/copilot/using-github-copilot/using-copilot-coding-agent), or wherever your agent discovers skills).
