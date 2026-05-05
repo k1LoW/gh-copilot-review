@@ -13,11 +13,11 @@ compatibility: Requires gh CLI and gh-copilot-review extension (gh extension ins
 ## Phase 1: Resolve the Target PR
 
 1. If the user passed an argument (PR number or URL), use it as `<arg>`. Otherwise, default to the PR for the current branch.
-2. Confirm the target PR before requesting a review:
+2. Resolve the target PR:
    - With `<arg>`: `gh pr view <arg> --json number,title,url,headRefName`
    - Without `<arg>`: `gh pr view --json number,title,url,headRefName`
-3. If no PR is found (e.g., current branch has no open PR), stop and tell the user. Do not proceed.
-4. Show the resolved PR (`#<number> <title>`) and ask the user to confirm before proceeding when the PR was auto-detected from the current branch. When the user explicitly passed `<arg>`, skip the confirmation.
+3. If no PR is found (e.g., current branch has no open PR), stop and ask the user which PR to target (number or URL). Do not proceed until the user provides one.
+4. Once the PR is identified, proceed directly to Phase 2 without asking the user to confirm. Briefly mention the resolved PR (`#<number> <title>`) in your status update so the user can interrupt if it is wrong.
 
 ## Phase 2: Request the Review
 
@@ -63,7 +63,6 @@ Then, depending on status:
 
 ## Rules
 
-- Never request a Copilot review on a PR the user has not confirmed when it was auto-detected from the current branch.
 - Do not pass `--force` unless the user explicitly asks to override the pre-conditions.
 - Do not push, merge, or modify code as part of this skill. It only requests a review and reports the outcome.
 - Prefer `gh` commands for GitHub data; do not call the REST/GraphQL API directly when an equivalent `gh` command exists.
