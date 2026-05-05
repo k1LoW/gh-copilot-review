@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.4.2](https://github.com/k1LoW/gh-copilot-review/compare/v0.4.1...v0.4.2) - 2026-05-05
+### Other Changes
+- docs: skip PR confirmation in request-copilot-review skill by @k1LoW in https://github.com/k1LoW/gh-copilot-review/pull/26
+
 ## [v0.4.1](https://github.com/k1LoW/gh-copilot-review/compare/v0.4.0...v0.4.1) - 2026-05-01
 ### Other Changes
 - feat: report unresolved Copilot inline comments on the current head by @k1LoW in https://github.com/k1LoW/gh-copilot-review/pull/24
