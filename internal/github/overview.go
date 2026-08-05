@@ -2,6 +2,7 @@ package github
 
 import (
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -17,58 +18,93 @@ type SuppressedComment struct {
 // CopilotReviewOverview is the parsed review overview (the review body) of a
 // submitted Copilot review.
 type CopilotReviewOverview struct {
-	URL                string
-	State              string
-	Body               string
-	Assessment         string
-	Summary            string
-	NotReadyToApprove  bool
+	URL        string
+	State      string
+	Body       string
+	Assessment string
+	Summary    string
+	// Approving reports whether Assessment explicitly approves the change.
+	Approving          bool
 	SuppressedComments []SuppressedComment
 }
 
 // NeedsAttention reports whether the overview itself raises something to
 // address, even when no unresolved inline review comment remains.
+// Any assessment that does not explicitly approve counts, because the exact
+// wording Copilot uses to decline is not fixed.
 func (o *CopilotReviewOverview) NeedsAttention() bool {
 	if o == nil {
 		return false
 	}
-	return o.NotReadyToApprove || o.State == "CHANGES_REQUESTED" || len(o.SuppressedComments) > 0
+	if o.State == "CHANGES_REQUESTED" || len(o.SuppressedComments) > 0 {
+		return true
+	}
+	return o.Assessment != "" && !o.Approving
 }
 
 var (
-	headingRe           = regexp.MustCompile(`^#{1,6}[ \t]+(.+?)[ \t]*$`)
-	suppressedHeadingRe = regexp.MustCompile(`(?i)^#{1,6}[ \t]+suppressed comments\b`)
-	suppressedEntryRe   = regexp.MustCompile(`^\*\*(.+?):(\d+)\*\*[ \t]*$`)
-	metadataRe          = regexp.MustCompile(`^[-*][ \t]+\*\*`)
+	headingRe         = regexp.MustCompile(`^#{1,6}[ \t]+(.+?)[ \t]*$`)
+	summaryRe         = regexp.MustCompile(`(?i)^<summary>(.*?)</summary>`)
+	suppressedTitleRe = regexp.MustCompile(`(?i)^suppressed comments\b`)
+	suppressedEntryRe = regexp.MustCompile(`^\*\*(.+?):(\d+)\*\*[ \t]*$`)
+	metadataRe        = regexp.MustCompile(`^[-*][ \t]+\*\*`)
+	approvingRe       = regexp.MustCompile(`(?i)\b(approved?|lgtm|looks good)\b`)
+	decliningRe       = regexp.MustCompile(`(?i)\bnot\b`)
 )
+
+// structuralTitles are the section titles Copilot renders in a review overview.
+// They can appear as the leading heading of a body that carries no assessment
+// at all, so they must never be reported as one.
+var structuralTitles = []string{
+	"pull request overview",
+	"file summaries",
+	"review details",
+	"files not reviewed",
+	"suppressed comments",
+	"comments suppressed",
+}
 
 // parseCopilotReviewOverview extracts the review assessment and the findings
 // Copilot only reported in the overview. Copilot renders the assessment as the
 // leading heading ("Not ready to approve" and friends) and lists findings it
-// did not post inline under a "Suppressed comments" heading, so both are
+// did not post inline under a "Suppressed comments" section, so both are
 // recovered from the Markdown body rather than from a dedicated API field.
 func parseCopilotReviewOverview(body string) *CopilotReviewOverview {
 	o := &CopilotReviewOverview{Body: body}
 	lines := strings.Split(strings.ReplaceAll(body, "\r\n", "\n"), "\n")
 
-	// Only a leading heading is an assessment. Bodies in the older overview
-	// format open with prose yet still carry headings further down, inside
-	// <details> ("Files not reviewed"), which must not be mistaken for one.
+	// Only a leading heading can be an assessment, and only when it is not one
+	// of the section titles Copilot always renders: a body carrying no
+	// assessment opens with "Pull request overview", and other bodies bury
+	// section headings inside <details> further down.
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" {
 			continue
 		}
-		if m := headingRe.FindStringSubmatch(trimmed); m != nil {
+		if m := headingRe.FindStringSubmatch(trimmed); m != nil && !isStructuralTitle(m[1]) {
 			o.Assessment = m[1]
 			o.Summary = firstParagraph(lines[i+1:])
 		}
 		break
 	}
-	o.NotReadyToApprove = strings.Contains(strings.ToLower(o.Assessment), "not ready to approve")
+	o.Approving = o.Assessment != "" &&
+		approvingRe.MatchString(o.Assessment) &&
+		!decliningRe.MatchString(o.Assessment)
 	o.SuppressedComments = parseSuppressedComments(lines)
 
 	return o
+}
+
+// isStructuralTitle reports whether a heading or <summary> text is one of
+// Copilot's own section titles rather than prose it wrote for this review.
+func isStructuralTitle(title string) bool {
+	// Titles carry a leading status emoji and a trailing count ("(3)"), so
+	// compare on the letters alone.
+	t := strings.ToLower(strings.TrimFunc(title, func(r rune) bool {
+		return ('a' > r || r > 'z') && ('A' > r || r > 'Z')
+	}))
+	return slices.Contains(structuralTitles, t)
 }
 
 // firstParagraph returns the first prose paragraph, skipping the italic
@@ -94,10 +130,23 @@ func firstParagraph(lines []string) string {
 	return strings.Join(paragraph, " ")
 }
 
+// isSuppressedSectionStart reports whether a line opens the suppressed
+// comments section. Copilot titles it either as a Markdown heading or as the
+// <summary> of its own <details> block, depending on the overview layout.
+func isSuppressedSectionStart(line string) bool {
+	if m := headingRe.FindStringSubmatch(line); m != nil {
+		return suppressedTitleRe.MatchString(m[1])
+	}
+	if m := summaryRe.FindStringSubmatch(line); m != nil {
+		return suppressedTitleRe.MatchString(strings.TrimSpace(m[1]))
+	}
+	return false
+}
+
 func parseSuppressedComments(lines []string) []SuppressedComment {
 	start := -1
 	for i, line := range lines {
-		if suppressedHeadingRe.MatchString(line) {
+		if isSuppressedSectionStart(strings.TrimSpace(line)) {
 			start = i + 1
 			break
 		}
@@ -139,9 +188,11 @@ func parseSuppressedComments(lines []string) []SuppressedComment {
 			current = &SuppressedComment{Path: m[1], Line: n}
 			continue
 		}
-		// The section ends at the next heading, at the review metadata list, or
-		// at the end of the enclosing <details> block.
-		if headingRe.MatchString(trimmed) || metadataRe.MatchString(trimmed) || strings.HasPrefix(trimmed, "</details>") {
+		// The section ends at the next heading or <details> block, at the review
+		// metadata list, or at the end of the enclosing <details> block.
+		if headingRe.MatchString(trimmed) || metadataRe.MatchString(trimmed) ||
+			strings.HasPrefix(trimmed, "</details>") || strings.HasPrefix(trimmed, "<details") ||
+			summaryRe.MatchString(trimmed) {
 			break
 		}
 		if current == nil || trimmed == "" {
