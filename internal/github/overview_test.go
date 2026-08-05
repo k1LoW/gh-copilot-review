@@ -106,18 +106,41 @@ func TestParseCopilotReviewOverviewApproved(t *testing.T) {
 }
 
 func TestParseCopilotReviewOverviewLegacyBody(t *testing.T) {
-	body := "Copilot reviewed 3 out of 3 changed files in this pull request and generated no comments."
-
-	o := parseCopilotReviewOverview(body)
-
-	if o.Assessment != "" {
-		t.Errorf("Assessment: got %q, want empty", o.Assessment)
+	tests := map[string]string{
+		"no heading at all": "Copilot reviewed 3 out of 3 changed files in this pull request and generated no comments.",
+		"prose first, headings only inside details": strings.Join([]string{
+			"Copilot reviewed 3 out of 5 changed files in this pull request and generated no comments.",
+			"",
+			"<details>",
+			"<summary>Review details</summary>",
+			"",
+			"### Files not reviewed (2)",
+			"",
+			"* **internal/store/mock/mock_store.go**: Generated file",
+			"* **internal/runner/mock/mock_runner.go**: Generated file",
+			"</details>",
+		}, "\n"),
 	}
-	if o.NotReadyToApprove {
-		t.Error("NotReadyToApprove: got true, want false")
-	}
-	if o.NeedsAttention() {
-		t.Error("NeedsAttention: got true, want false")
+
+	for name, body := range tests {
+		t.Run(name, func(t *testing.T) {
+			o := parseCopilotReviewOverview(body)
+
+			// A body with no leading heading carries no assessment, however
+			// many headings it buries in its <details> blocks.
+			if o.Assessment != "" {
+				t.Errorf("Assessment: got %q, want empty", o.Assessment)
+			}
+			if o.Summary != "" {
+				t.Errorf("Summary: got %q, want empty", o.Summary)
+			}
+			if o.NotReadyToApprove {
+				t.Error("NotReadyToApprove: got true, want false")
+			}
+			if o.NeedsAttention() {
+				t.Error("NeedsAttention: got true, want false")
+			}
+		})
 	}
 }
 

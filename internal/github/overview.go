@@ -51,13 +51,18 @@ func parseCopilotReviewOverview(body string) *CopilotReviewOverview {
 	o := &CopilotReviewOverview{Body: body}
 	lines := strings.Split(strings.ReplaceAll(body, "\r\n", "\n"), "\n")
 
+	// Only a leading heading is an assessment. Bodies in the older overview
+	// format open with prose yet still carry headings further down, inside
+	// <details> ("Files not reviewed"), which must not be mistaken for one.
 	for i, line := range lines {
-		m := headingRe.FindStringSubmatch(line)
-		if m == nil {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
 			continue
 		}
-		o.Assessment = m[1]
-		o.Summary = firstParagraph(lines[i+1:])
+		if m := headingRe.FindStringSubmatch(trimmed); m != nil {
+			o.Assessment = m[1]
+			o.Summary = firstParagraph(lines[i+1:])
+		}
 		break
 	}
 	o.NotReadyToApprove = strings.Contains(strings.ToLower(o.Assessment), "not ready to approve")
