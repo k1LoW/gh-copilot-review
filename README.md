@@ -7,6 +7,7 @@ It is more than a simple wrapper around `gh pr edit --add-reviewer @copilot`:
 - **Duplicate prevention** — Skips the request if Copilot is already assigned as a reviewer, has a pending review, or has already reviewed the current head commit.
 - **Outdated review cleanup** — Automatically hides (minimizes as "outdated") previous Copilot review overviews before requesting a new review.
 - **Wait for completion** — Optionally polls until Copilot finishes reviewing with `--wait`.
+- **Review overview findings** — Reports Copilot's review assessment (e.g. `🟡 Not ready to approve`) and the findings it lists only in the review overview as "suppressed comments", not just the unresolved inline comments.
 
 ## Usage
 
@@ -51,6 +52,14 @@ Copilot review requested on PR #42
 Waiting for Copilot review... (30s elapsed)
 Waiting for Copilot review... (1m0s elapsed)
 Copilot review completed on PR #42
+Copilot review assessment: 🟡 Not ready to approve
+  There are a few correctness issues that should be addressed before approval.
+Review overview: https://github.com/owner/repo/pull/42#pullrequestreview-1234567890
+Copilot has 1 suppressed review comment(s) (reported in the review overview, not as inline comments):
+  - internal/server/handler.go:207
+    This switch has no default case. ...
+No unresolved inline review comments from Copilot
+Copilot did not approve this pull request; address the review overview above
 ```
 
 ### Options
