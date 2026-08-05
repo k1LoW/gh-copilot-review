@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.5.0](https://github.com/k1LoW/gh-copilot-review/compare/v0.4.2...v0.5.0) - 2026-08-05
+
+### New Features 🎉
+- feat: report Copilot review overview findings, not just inline comments by @k1LoW in https://github.com/k1LoW/gh-copilot-review/pull/31
+### Dependency Updates ⬆️
+- chore(deps): bump actions/checkout from 6 to 7 in the dependencies group by @dependabot[bot] in https://github.com/k1LoW/gh-copilot-review/pull/28
+- chore(deps): bump actions/setup-go from 6 to 7 in the dependencies group by @dependabot[bot] in https://github.com/k1LoW/gh-copilot-review/pull/30
+
 ## [v0.4.2](https://github.com/k1LoW/gh-copilot-review/compare/v0.4.1...v0.4.2) - 2026-05-05
 ### Other Changes
 - docs: skip PR confirmation in request-copilot-review skill by @k1LoW in https://github.com/k1LoW/gh-copilot-review/pull/26
