@@ -132,6 +132,81 @@ func (c *Client) CheckCopilotReviewStatus(prNumber int) (*CopilotReviewStatus, e
 	return status, nil
 }
 
+// LatestCopilotReviewOverview returns the parsed review overview of the most
+// recently submitted, non-minimized Copilot review tied to the current head
+// commit, or nil when there is none. The overview carries Copilot's review
+// assessment (e.g. "Not ready to approve") and the findings it reported only
+// in the body instead of as inline comments, neither of which is visible
+// through the inline review threads.
+func (c *Client) LatestCopilotReviewOverview(prNumber int) (*CopilotReviewOverview, error) {
+	var query struct {
+		Repository struct {
+			PullRequest struct {
+				HeadRefOid string `graphql:"headRefOid"`
+				Reviews    struct {
+					Nodes []struct {
+						Author struct {
+							Login string
+						}
+						Body        string
+						URL         string `graphql:"url"`
+						State       string
+						IsMinimized bool `graphql:"isMinimized"`
+						Commit      struct {
+							Oid string
+						}
+					}
+					PageInfo struct {
+						HasNextPage bool
+						EndCursor   string
+					}
+				} `graphql:"reviews(first: 100, after: $cursor)"`
+			} `graphql:"pullRequest(number: $number)"`
+		} `graphql:"repository(owner: $owner, name: $repo)"`
+	}
+
+	variables := map[string]any{
+		"owner":  graphql.String(c.owner),
+		"repo":   graphql.String(c.repo),
+		"number": graphql.Int(int32(prNumber)), //nolint:gosec // PR numbers won't overflow int32
+		"cursor": (*graphql.String)(nil),
+	}
+
+	var overview *CopilotReviewOverview
+	for {
+		err := c.gql.Query("CopilotReviewOverview", &query, variables)
+		if err != nil {
+			return nil, fmt.Errorf("failed to query review overview: %w", err)
+		}
+
+		head := query.Repository.PullRequest.HeadRefOid
+		// Reviews come back oldest first, so the last match wins.
+		for _, r := range query.Repository.PullRequest.Reviews.Nodes {
+			if !isCopilotUser(r.Author.Login) {
+				continue
+			}
+			if r.IsMinimized || r.State == "PENDING" {
+				continue
+			}
+			if r.Commit.Oid != head {
+				continue
+			}
+			o := parseCopilotReviewOverview(r.Body)
+			o.URL = r.URL
+			o.State = r.State
+			overview = o
+		}
+
+		if !query.Repository.PullRequest.Reviews.PageInfo.HasNextPage {
+			break
+		}
+		cursor := graphql.String(query.Repository.PullRequest.Reviews.PageInfo.EndCursor)
+		variables["cursor"] = &cursor
+	}
+
+	return overview, nil
+}
+
 // CountUnresolvedCopilotInlineComments returns the number of unresolved
 // inline review threads whose originating comment was authored by Copilot
 // on a submitted (non-PENDING), non-minimized review tied to the current

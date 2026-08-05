@@ -84,7 +84,7 @@ func run(cmd *cobra.Command, args []string) error {
 		if status.Fresh {
 			fmt.Println("Copilot review is already up to date for the current head commit")
 			if waitFlag {
-				if err := reportUnresolvedInlineComments(client, prNumber); err != nil {
+				if err := reportCopilotFindings(client, prNumber); err != nil {
 					return err
 				}
 			}
@@ -153,7 +153,7 @@ func run(cmd *cobra.Command, args []string) error {
 			return err
 		}
 		if postStatus.Fresh {
-			if err := reportUnresolvedInlineComments(client, prNumber); err != nil {
+			if err := reportCopilotFindings(client, prNumber); err != nil {
 				return err
 			}
 		}
@@ -162,7 +162,32 @@ func run(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func reportUnresolvedInlineComments(client *ghclient.Client, prNumber int) error {
+func reportCopilotFindings(client *ghclient.Client, prNumber int) error {
+	overview, err := client.LatestCopilotReviewOverview(prNumber)
+	if err != nil {
+		return err
+	}
+	if overview != nil {
+		if overview.Assessment != "" {
+			fmt.Printf("Copilot review assessment: %s\n", overview.Assessment)
+			if overview.Summary != "" {
+				fmt.Printf("  %s\n", overview.Summary)
+			}
+		}
+		if overview.URL != "" {
+			fmt.Printf("Review overview: %s\n", overview.URL)
+		}
+		if n := len(overview.SuppressedComments); n > 0 {
+			fmt.Printf("Copilot has %d suppressed review comment(s) (reported in the review overview, not as inline comments):\n", n)
+			for _, sc := range overview.SuppressedComments {
+				fmt.Printf("  - %s:%d\n", sc.Path, sc.Line)
+				for line := range strings.SplitSeq(sc.Body, "\n") {
+					fmt.Printf("    %s\n", line)
+				}
+			}
+		}
+	}
+
 	count, err := client.CountUnresolvedCopilotInlineComments(prNumber)
 	if err != nil {
 		return err
@@ -171,6 +196,10 @@ func reportUnresolvedInlineComments(client *ghclient.Client, prNumber int) error
 		fmt.Println("No unresolved inline review comments from Copilot")
 	} else {
 		fmt.Printf("Copilot has %d unresolved inline review comment(s)\n", count)
+	}
+
+	if count == 0 && overview.NeedsAttention() {
+		fmt.Println("Copilot did not approve this pull request; address the review overview above")
 	}
 	return nil
 }
