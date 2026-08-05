@@ -48,8 +48,11 @@ var (
 	suppressedTitleRe = regexp.MustCompile(`(?i)^suppressed comments\b`)
 	suppressedEntryRe = regexp.MustCompile(`^\*\*(.+?):(\d+)\*\*[ \t]*$`)
 	metadataRe        = regexp.MustCompile(`^[-*][ \t]+\*\*`)
-	approvingRe       = regexp.MustCompile(`(?i)\b(approved?|lgtm|looks good)\b`)
-	decliningRe       = regexp.MustCompile(`(?i)\bnot\b`)
+	// An assessment approves only when it opens with one of these phrases.
+	// Matching declining wording instead would have to enumerate every way
+	// Copilot can say no ("Cannot approve" hides "approve" behind no bare
+	// "not"), and every phrase left out would read as an approval.
+	approvingRe = regexp.MustCompile(`(?i)^(ready to approve|approved?|lgtm|looks good)\b`)
 )
 
 // structuralTitles are the section titles Copilot renders in a review overview.
@@ -88,9 +91,7 @@ func parseCopilotReviewOverview(body string) *CopilotReviewOverview {
 		}
 		break
 	}
-	o.Approving = o.Assessment != "" &&
-		approvingRe.MatchString(o.Assessment) &&
-		!decliningRe.MatchString(o.Assessment)
+	o.Approving = o.Assessment != "" && approvingRe.MatchString(trimTitle(o.Assessment))
 	o.SuppressedComments = parseSuppressedComments(lines)
 
 	return o
@@ -99,12 +100,16 @@ func parseCopilotReviewOverview(body string) *CopilotReviewOverview {
 // isStructuralTitle reports whether a heading or <summary> text is one of
 // Copilot's own section titles rather than prose it wrote for this review.
 func isStructuralTitle(title string) bool {
-	// Titles carry a leading status emoji and a trailing count ("(3)"), so
-	// compare on the letters alone.
-	t := strings.ToLower(strings.TrimFunc(title, func(r rune) bool {
+	return slices.Contains(structuralTitles, strings.ToLower(trimTitle(title)))
+}
+
+// trimTitle strips the decoration around a title so it can be compared as
+// words: assessments carry a leading status emoji, section titles a trailing
+// count ("(3)").
+func trimTitle(title string) string {
+	return strings.TrimFunc(title, func(r rune) bool {
 		return ('a' > r || r > 'z') && ('A' > r || r > 'Z')
-	}))
-	return slices.Contains(structuralTitles, t)
+	})
 }
 
 // firstParagraph returns the first prose paragraph, skipping the italic

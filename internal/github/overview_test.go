@@ -103,6 +103,19 @@ func TestParseCopilotReviewOverviewApproved(t *testing.T) {
 	if o.NeedsAttention() {
 		t.Error("NeedsAttention: got true, want false")
 	}
+
+	for _, assessment := range []string{"✅ Approved", "🟢 LGTM", "🟢 Looks good to me", "Approved with minor comments"} {
+		t.Run(assessment, func(t *testing.T) {
+			o := parseCopilotReviewOverview("### " + assessment + "\n\nNothing blocking.")
+
+			if !o.Approving {
+				t.Error("Approving: got false, want true")
+			}
+			if o.NeedsAttention() {
+				t.Error("NeedsAttention: got true, want false")
+			}
+		})
+	}
 }
 
 func TestParseCopilotReviewOverviewLegacyBody(t *testing.T) {
@@ -181,8 +194,18 @@ func TestParseCopilotReviewOverviewLegacyOverviewWithSuppressedComments(t *testi
 
 func TestParseCopilotReviewOverviewUnknownNonApprovingAssessment(t *testing.T) {
 	// The exact wording Copilot uses to decline is not fixed, so anything that
-	// does not explicitly approve must still count as needing attention.
-	for _, assessment := range []string{"🔴 Changes needed", "🟡 Needs work before approval", "🟠 Blocked"} {
+	// does not explicitly approve must still count as needing attention —
+	// including wording that embeds an approving keyword.
+	for _, assessment := range []string{
+		"🔴 Changes needed",
+		"🟡 Needs work before approval",
+		"🟠 Blocked",
+		"🔴 Cannot approve",
+		"🔴 Can't approve yet",
+		"🟡 Won't approve until tests pass",
+		"🟡 Doesn't look good",
+		"🟡 Not approved",
+	} {
 		t.Run(assessment, func(t *testing.T) {
 			o := parseCopilotReviewOverview("### " + assessment + "\n\nSomething to fix.")
 
