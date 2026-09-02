@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -59,14 +60,24 @@ func run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	status, err := client.CheckCopilotReviewStatus(prNumber)
+	if err != nil {
+		return err
+	}
+
+	// Minimizing runs before any early return because a repository that reviews
+	// on push already has a fresh review by the time this command runs, and
+	// those runs would otherwise leave every earlier review expanded forever.
+	targets := status.OutdatedReviewIDs
 	if forceFlag {
-		minimized, err := client.MinimizeCopilotComments(prNumber)
-		if err != nil {
-			return err
-		}
-		if minimized > 0 {
-			fmt.Printf("Minimized %d outdated Copilot review(s)\n", minimized)
-		}
+		// A forced re-request supersedes the review on the current head too.
+		targets = append(slices.Clone(targets), status.HeadReviewIDs...)
+	}
+	if minimized := client.MinimizeReviews(targets); minimized > 0 {
+		fmt.Printf("Minimized %d outdated Copilot review(s)\n", minimized)
+	}
+
+	if forceFlag {
 		if err := client.RequestCopilotReview(prNumber); err != nil {
 			return err
 		}
@@ -77,10 +88,6 @@ func run(cmd *cobra.Command, args []string) error {
 			return err
 		}
 
-		status, err := client.CheckCopilotReviewStatus(prNumber)
-		if err != nil {
-			return err
-		}
 		if status.Fresh {
 			fmt.Println("Copilot review is already up to date for the current head commit")
 			if waitFlag {
@@ -93,14 +100,6 @@ func run(cmd *cobra.Command, args []string) error {
 		if status.Pending && !waitFlag {
 			fmt.Println("Copilot review is in progress")
 			return nil
-		}
-
-		minimized, err := client.MinimizeCopilotComments(prNumber)
-		if err != nil {
-			return err
-		}
-		if minimized > 0 {
-			fmt.Printf("Minimized %d outdated Copilot review(s)\n", minimized)
 		}
 
 		if !status.Pending {
