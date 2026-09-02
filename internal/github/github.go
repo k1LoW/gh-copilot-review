@@ -433,7 +433,7 @@ func (c *Client) MinimizeReviews(ids []string) int {
 			"id": graphql.ID(id),
 		}
 		if err := c.gql.Mutate("MinimizeComment", &mutation, vars); err != nil {
-			fmt.Printf("Warning: failed to minimize comment %s: %v\n", id, err)
+			fmt.Fprintf(os.Stderr, "Warning: failed to minimize review %s: %v\n", id, err)
 			continue
 		}
 		minimized++
