@@ -58,11 +58,47 @@ func (c *Client) IsCopilotReviewRequested(prNumber int) (bool, error) {
 type CopilotReviewStatus struct {
 	Pending bool
 	Fresh   bool
+	// OutdatedReviewIDs are submitted, non-minimized Copilot reviews tied to a
+	// commit other than the current head.
+	OutdatedReviewIDs []string
+	// HeadReviewIDs are submitted, non-minimized Copilot reviews tied to the
+	// current head commit.
+	HeadReviewIDs []string
 }
 
-// CheckCopilotReviewStatus fetches reviews via GraphQL and determines both
-// whether Copilot has a pending review and whether it has already
-// reviewed the current head commit.
+// copilotReview is a single review node reduced to the fields that decide how
+// it is classified.
+type copilotReview struct {
+	ID          string
+	Login       string
+	State       string
+	IsMinimized bool
+	CommitOid   string
+}
+
+// collect folds one review node into the status.
+// Reviews are bucketed by the commit they are tied to rather than by whether a
+// newer review exists, so a caller that finds an up-to-date review can still
+// minimize every older one without touching the up-to-date one.
+func (s *CopilotReviewStatus) collect(head string, r copilotReview) {
+	if !isCopilotUser(r.Login) || r.IsMinimized {
+		return
+	}
+	if r.State == "PENDING" {
+		s.Pending = true
+		return
+	}
+	if r.CommitOid == head {
+		s.Fresh = true
+		s.HeadReviewIDs = append(s.HeadReviewIDs, r.ID)
+		return
+	}
+	s.OutdatedReviewIDs = append(s.OutdatedReviewIDs, r.ID)
+}
+
+// CheckCopilotReviewStatus fetches reviews via GraphQL and determines whether
+// Copilot has a pending review, whether it has already reviewed the current
+// head commit, and which of its reviews are outdated.
 // GraphQL is used instead of REST because the REST reviews endpoint
 // does not expose PENDING reviews or the IsMinimized field.
 func (c *Client) CheckCopilotReviewStatus(prNumber int) (*CopilotReviewStatus, error) {
@@ -72,6 +108,7 @@ func (c *Client) CheckCopilotReviewStatus(prNumber int) (*CopilotReviewStatus, e
 				HeadRefOid string `graphql:"headRefOid"`
 				Reviews    struct {
 					Nodes []struct {
+						ID     string `graphql:"id"`
 						Author struct {
 							Login string
 						}
@@ -98,31 +135,35 @@ func (c *Client) CheckCopilotReviewStatus(prNumber int) (*CopilotReviewStatus, e
 	}
 
 	status := &CopilotReviewStatus{}
-	var headRefOid string
+	// The head is pinned to the first page so that a push landing mid-pagination
+	// cannot classify later pages against a different commit than earlier ones.
+	// The result is then a snapshot as of the first page, which the next run
+	// supersedes anyway.
+	var head string
 	for {
 		err := c.gql.Query("CopilotReviewStatus", &query, variables)
 		if err != nil {
 			return nil, fmt.Errorf("failed to query review status: %w", err)
 		}
 
-		headRefOid = query.Repository.PullRequest.HeadRefOid
-
-		for _, r := range query.Repository.PullRequest.Reviews.Nodes {
-			if !isCopilotUser(r.Author.Login) {
-				continue
-			}
-			if r.IsMinimized {
-				continue
-			}
-			if r.State == "PENDING" {
-				status.Pending = true
-			}
-			if r.State != "PENDING" && r.Commit.Oid == headRefOid {
-				status.Fresh = true
+		if head == "" {
+			head = query.Repository.PullRequest.HeadRefOid
+			if head == "" {
+				return nil, fmt.Errorf("failed to resolve head commit of PR #%d", prNumber)
 			}
 		}
 
-		if (status.Pending && status.Fresh) || !query.Repository.PullRequest.Reviews.PageInfo.HasNextPage {
+		for _, r := range query.Repository.PullRequest.Reviews.Nodes {
+			status.collect(head, copilotReview{
+				ID:          r.ID,
+				Login:       r.Author.Login,
+				State:       r.State,
+				IsMinimized: r.IsMinimized,
+				CommitOid:   r.Commit.Oid,
+			})
+		}
+
+		if !query.Repository.PullRequest.Reviews.PageInfo.HasNextPage {
 			break
 		}
 		cursor := graphql.String(query.Repository.PullRequest.Reviews.PageInfo.EndCursor)
@@ -382,59 +423,12 @@ func (c *Client) isReviewComplete(prNumber int, sawRequestedOrPending bool) (boo
 	return false, observedActive, nil
 }
 
-func (c *Client) MinimizeCopilotComments(prNumber int) (int, error) {
-	var query struct {
-		Repository struct {
-			PullRequest struct {
-				Reviews struct {
-					Nodes []struct {
-						ID          string `graphql:"id"`
-						IsMinimized bool   `graphql:"isMinimized"`
-						Author      struct {
-							Login string
-						}
-					}
-					PageInfo struct {
-						HasNextPage bool
-						EndCursor   string
-					}
-				} `graphql:"reviews(first: 100, after: $cursor)"`
-			} `graphql:"pullRequest(number: $number)"`
-		} `graphql:"repository(owner: $owner, name: $repo)"`
-	}
-
-	variables := map[string]any{
-		"owner":  graphql.String(c.owner),
-		"repo":   graphql.String(c.repo),
-		"number": graphql.Int(int32(prNumber)), //nolint:gosec // PR numbers won't overflow int32
-		"cursor": (*graphql.String)(nil),
-	}
-
-	var subjectIDs []string
-	for {
-		err := c.gql.Query("CopilotReviewComments", &query, variables)
-		if err != nil {
-			return 0, fmt.Errorf("failed to query review comments: %w", err)
-		}
-
-		for _, review := range query.Repository.PullRequest.Reviews.Nodes {
-			if !isCopilotUser(review.Author.Login) {
-				continue
-			}
-			if !review.IsMinimized {
-				subjectIDs = append(subjectIDs, review.ID)
-			}
-		}
-
-		if !query.Repository.PullRequest.Reviews.PageInfo.HasNextPage {
-			break
-		}
-		cursor := graphql.String(query.Repository.PullRequest.Reviews.PageInfo.EndCursor)
-		variables["cursor"] = &cursor
-	}
-
+// MinimizeReviews minimizes the given reviews as OUTDATED and returns how many
+// were minimized. A review that cannot be minimized is reported as a warning
+// and skipped, so one rejected subject does not abort the rest.
+func (c *Client) MinimizeReviews(ids []string) int {
 	minimized := 0
-	for _, id := range subjectIDs {
+	for _, id := range ids {
 		var mutation struct {
 			MinimizeComment struct {
 				MinimizedComment struct {
@@ -446,11 +440,11 @@ func (c *Client) MinimizeCopilotComments(prNumber int) (int, error) {
 			"id": graphql.ID(id),
 		}
 		if err := c.gql.Mutate("MinimizeComment", &mutation, vars); err != nil {
-			fmt.Printf("Warning: failed to minimize comment %s: %v\n", id, err)
+			fmt.Fprintf(os.Stderr, "Warning: failed to minimize review %s: %v\n", id, err)
 			continue
 		}
 		minimized++
 	}
 
-	return minimized, nil
+	return minimized
 }

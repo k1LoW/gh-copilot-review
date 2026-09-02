@@ -52,7 +52,11 @@ var (
 	// Matching declining wording instead would have to enumerate every way
 	// Copilot can say no ("Cannot approve" hides "approve" behind no bare
 	// "not"), and every phrase left out would read as an approval.
-	approvingRe = regexp.MustCompile(`(?i)^(ready to approve|approved?|lgtm|looks good)\b`)
+	// "approval recommended" is spelled out rather than folded into a bare
+	// "approval" prefix, because the cost of the two mistakes is not
+	// symmetric: an unrecognized approval is noise, while an unrecognized
+	// decline read as an approval is a review silently dismissed.
+	approvingRe = regexp.MustCompile(`(?i)^(ready to approve|approval recommended|approved?|lgtm|looks good)\b`)
 )
 
 // structuralTitles are the section titles Copilot renders in a review overview.
