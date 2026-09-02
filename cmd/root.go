@@ -74,7 +74,7 @@ func run(cmd *cobra.Command, args []string) error {
 		targets = append(slices.Clone(targets), status.HeadReviewIDs...)
 	}
 	if minimized := client.MinimizeReviews(targets); minimized > 0 {
-		fmt.Printf("Minimized %d outdated Copilot review(s)\n", minimized)
+		fmt.Printf("Minimized %d Copilot review(s)\n", minimized)
 	}
 
 	if forceFlag {

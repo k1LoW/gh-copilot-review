@@ -41,13 +41,13 @@ $ gh copilot-review --force
 
 ```console
 $ gh copilot-review 42
-Minimized 3 outdated Copilot review(s)
+Minimized 3 Copilot review(s)
 Copilot review requested on PR #42
 ```
 
 ```console
 $ gh copilot-review 42 --wait
-Minimized 1 outdated Copilot review(s)
+Minimized 1 Copilot review(s)
 Copilot review requested on PR #42
 Waiting for Copilot review... (30s elapsed)
 Waiting for Copilot review... (1m0s elapsed)
