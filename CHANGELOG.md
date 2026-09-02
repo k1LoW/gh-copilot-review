@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.5.1](https://github.com/k1LoW/gh-copilot-review/compare/v0.5.0...v0.5.1) - 2026-09-02
+
+### Fix bug 🐛
+- fix: minimize outdated Copilot reviews on every run by @k1LoW in https://github.com/k1LoW/gh-copilot-review/pull/32
+
 ## [v0.5.0](https://github.com/k1LoW/gh-copilot-review/compare/v0.4.2...v0.5.0) - 2026-08-05
 
 ### New Features 🎉
