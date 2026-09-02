@@ -104,7 +104,7 @@ func TestParseCopilotReviewOverviewApproved(t *testing.T) {
 		t.Error("NeedsAttention: got true, want false")
 	}
 
-	for _, assessment := range []string{"✅ Approved", "🟢 LGTM", "🟢 Looks good to me", "Approved with minor comments"} {
+	for _, assessment := range []string{"✅ Approved", "🟢 LGTM", "🟢 Looks good to me", "Approved with minor comments", "🟢 Approval recommended"} {
 		t.Run(assessment, func(t *testing.T) {
 			o := parseCopilotReviewOverview("### " + assessment + "\n\nNothing blocking.")
 
@@ -205,6 +205,7 @@ func TestParseCopilotReviewOverviewUnknownNonApprovingAssessment(t *testing.T) {
 		"🟡 Won't approve until tests pass",
 		"🟡 Doesn't look good",
 		"🟡 Not approved",
+		"🟡 Approval pending",
 	} {
 		t.Run(assessment, func(t *testing.T) {
 			o := parseCopilotReviewOverview("### " + assessment + "\n\nSomething to fix.")
