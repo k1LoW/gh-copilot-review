@@ -135,15 +135,22 @@ func (c *Client) CheckCopilotReviewStatus(prNumber int) (*CopilotReviewStatus, e
 	}
 
 	status := &CopilotReviewStatus{}
+	// The head is pinned to the first page so that a push landing mid-pagination
+	// cannot classify later pages against a different commit than earlier ones.
+	// The result is then a snapshot as of the first page, which the next run
+	// supersedes anyway.
+	var head string
 	for {
 		err := c.gql.Query("CopilotReviewStatus", &query, variables)
 		if err != nil {
 			return nil, fmt.Errorf("failed to query review status: %w", err)
 		}
 
-		head := query.Repository.PullRequest.HeadRefOid
 		if head == "" {
-			return nil, fmt.Errorf("failed to resolve head commit of PR #%d", prNumber)
+			head = query.Repository.PullRequest.HeadRefOid
+			if head == "" {
+				return nil, fmt.Errorf("failed to resolve head commit of PR #%d", prNumber)
+			}
 		}
 
 		for _, r := range query.Repository.PullRequest.Reviews.Nodes {
