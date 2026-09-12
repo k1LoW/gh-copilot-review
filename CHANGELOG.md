@@ -1,5 +1,12 @@
 # Changelog
 
+## [v0.5.2](https://github.com/k1LoW/gh-copilot-review/compare/v0.5.1...v0.5.2) - 2026-09-12
+
+### Dependency Updates ⬆️
+- chore(deps): bump github.com/cli/go-gh/v2 from 2.13.0 to 2.16.0 in the dependencies group by @dependabot[bot] in https://github.com/k1LoW/gh-copilot-review/pull/34
+### Other Changes
+- docs: hide superseded PR-level replies in the request-copilot-review skill by @k1LoW in https://github.com/k1LoW/gh-copilot-review/pull/36
+
 ## [v0.5.1](https://github.com/k1LoW/gh-copilot-review/compare/v0.5.0...v0.5.1) - 2026-09-02
 
 ### Fix bug 🐛
