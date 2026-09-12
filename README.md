@@ -79,7 +79,7 @@ $ gh extension install k1LoW/gh-copilot-review
 
 ## Agent Skill
 
-This repository includes an example [Agent Skill](https://agentskills.io/), [**request-copilot-review**](skills/request-copilot-review/SKILL.md). It uses `gh copilot-review --wait` to request a Copilot review on a pull request, waits until it completes, and reports how many unresolved Copilot inline review comments remain on the current head commit.
+This repository includes an example [Agent Skill](https://agentskills.io/), [**request-copilot-review**](skills/request-copilot-review/SKILL.md). It uses `gh copilot-review --wait` to request a Copilot review on a pull request, waits until it completes, minimizes the PR-level replies you wrote to the review overviews the run just hid, and reports how many unresolved Copilot inline review comments remain on the current head commit.
 
 You can install it via [skills.sh](https://skills.sh/):
 
