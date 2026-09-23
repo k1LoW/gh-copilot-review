@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.5.3](https://github.com/k1LoW/gh-copilot-review/compare/v0.5.2...v0.5.3) - 2026-09-23
+
+### Dependency Updates ⬆️
+- chore(deps): bump github.com/cli/go-gh/v2 from 2.16.0 to 2.16.1 in the dependencies group by @dependabot[bot] in https://github.com/k1LoW/gh-copilot-review/pull/37
+
 ## [v0.5.2](https://github.com/k1LoW/gh-copilot-review/compare/v0.5.1...v0.5.2) - 2026-09-12
 
 ### Dependency Updates ⬆️
